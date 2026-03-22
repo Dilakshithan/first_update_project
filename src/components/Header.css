@@ -1,0 +1,71 @@
+.menu-window {
+  position: fixed;
+  min-width: 200px;
+  background-color: #1c2233;
+  border: 1px solid #2a3041;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+  z-index: 999;
+}
+.nav {
+  display: flex;
+  flex-direction: row;     
+  align-items: center;     
+  gap: 8px;
+  color: #9ca3af;
+  font-size: 14px;
+}
+.menu-item {
+  display: flex;           /* 🔥 prevents stacking */
+  align-items: center;
+  height: 32px;
+  line-height: 32px;
+  padding: 0px 12px;
+  border-radius: 6px;
+  color: #e5e7eb;          /* 🔥 force visible text */
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;     /* 🔥 no text wrapping */
+}
+
+.menu-window h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #7ea1dd;
+  
+}
+
+.window-item {
+  padding: 6px 12px;
+  font-size: 13px;
+  color: #3ea3da;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.window-item:hover {
+  background-color: #2a3041;
+  color: #3b82f6;
+}
+.menu-item:hover {
+  background-color: #1c2233;
+  color: #3b82f6;
+}
+
+.menu-item.active {
+  background-color: #2a3041;
+  color: #ffffff;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  padding: 6px;
+  color: cyan;
+}
+.logo {
+  font-size: 18px;
+  font-weight: bold;
+  padding: 0 12px ;
+  
+}

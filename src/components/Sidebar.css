@@ -1,0 +1,91 @@
+.sidebar {
+  flex: 3; /* 30% width in flex layout */
+  background-color: #0a0e1a; /* primary background */
+  border-radius: 8px;
+  border: 1px solid #2a3041;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+/* Tab headers */
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tab {
+  flex: 1;
+  text-align: center;
+  padding: 8px 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #9ca3af; /* secondary text */
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+
+.tab.active {
+  color: #3b82f6; /* accent blue */
+  border-bottom: 2px solid #3b82f6;
+}
+
+/* Tab content */
+.tab-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Code card */
+.code-card {
+  background-color: #141824; /* secondary background */
+  border-radius: 8px;
+  border: 1px solid #2a3041;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #e5e7eb; /* primary text */
+}
+
+.card-desc {
+  font-size: 14px;
+  color: #9ca3af; /* secondary text */
+}
+
+.extract-btn {
+  padding: 8px 16px;
+  background-color: #10b981; /* green action */
+  color: #0a0e1a;
+  font-weight: bold;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.extract-btn:hover {
+  opacity: 0.9;
+}
+
+.output-area {
+  height: 320px;          /* increase height (change as you like) */
+  max-height: 420px;      /* optional limit */
+  overflow-y: auto;       /* scroll */
+  overflow-x: auto;       /* if long lines */
+  padding: 12px;
+  border: 1px solid #2a3041;
+  border-radius: 8px;
+  background: #0f1320;
+  color: #e5e7eb;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 13px;
+  line-height: 1.4;
+  white-space: pre;       /* keep formatting */
+}
