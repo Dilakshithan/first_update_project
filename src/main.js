@@ -177,6 +177,14 @@ function getChatWorker() {
 
     async function initChat(modelsPath) {
       if (chatModel) return chatModel;
+
+      const fs = require('node:fs');
+      const path = require('node:path');
+      const expectedDir = path.join(modelsPath, 'Xenova', 'Qwen1.5-0.5B-Chat');
+      if (!fs.existsSync(path.join(expectedDir, 'tokenizer.json'))) {
+        throw new Error(\`Offline AI Model Missing or Incorrectly Named!\\nCould not find model at: \${expectedDir}\\n\\nPlease ensure:\\n1. You downloaded the ONNX weights for "Xenova/Qwen1.5-0.5B-Chat".\\n2. You placed them inside a "Xenova" folder, so the path ends with "models/Xenova/Qwen1.5-0.5B-Chat/tokenizer.json".\`);
+      }
+
       process.env.OMP_NUM_THREADS = '2';
       const { pipeline, env } = await import('@xenova/transformers');
       env.allowLocalModels = true;
@@ -252,6 +260,14 @@ function getWhisperWorker() {
 
     async function initTranscriber(modelsPath) {
       if (transcriber) return transcriber;
+
+      const fs = require('node:fs');
+      const path = require('node:path');
+      const expectedDir = path.join(modelsPath, 'Xenova', 'whisper-tiny.en');
+      if (!fs.existsSync(expectedDir)) {
+        throw new Error(\`Offline Transcription Model Missing or Incorrectly Named!\\nCould not find model at: \${expectedDir}\\n\\nPlease ensure:\\n1. You downloaded the ONNX weights for "Xenova/whisper-tiny.en".\\n2. You placed them inside a "Xenova" folder, so the path ends with "models/Xenova/whisper-tiny.en/".\`);
+      }
+
       process.env.OMP_NUM_THREADS = '2'; // prevent 100% CPU lockup on Windows
       const { pipeline, env } = await import('@xenova/transformers');
       env.allowLocalModels = true;
