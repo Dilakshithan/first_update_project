@@ -1,11 +1,17 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import "./RoiSelector.css";
 
-export default function RoiSelector({ enabled = true, onChange }) {
+export default function RoiSelector({ enabled = true, currentRoi, onChange }) {
   const overlayRef = useRef(null);
   const [dragging, setDragging] = useState(false);
   const [start, setStart] = useState(null);
   const [box, setBox] = useState(null);
+
+  useEffect(() => {
+    if (!currentRoi && !dragging) {
+      setBox(null);
+    }
+  }, [currentRoi, dragging]);
 
   const getNormPoint = (clientX, clientY) => {
     const rect = overlayRef.current.getBoundingClientRect();

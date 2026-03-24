@@ -1,244 +1,261 @@
 // src/components/Sidebar.jsx
-import React, { useEffect, useRef, useState } from "react";
-import Tesseract from "tesseract.js";
+import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
+import CodeExtractionPanel from "./CodeExtractionPanel";
 import "./Sidebar.css";
 
-export default function Sidebar({ videoPlayerRef, roi }) {
+const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRoi, onRequestRoiSelect, onCancelRoiSelect }, ref) {
   const [activeTab, setActiveTab] = useState("Code");
 
+  // --- Speech / Audio Extraction ---
+  const [speechLoading, setSpeechLoading] = useState(false);
+  const [speechChunks, setSpeechChunks] = useState([]);
+  const [speechSearchTerm, setSpeechSearchTerm] = useState("");
+  const [speechError, setSpeechError] = useState(null);
+  const [speechMode, setSpeechMode] = useState("idle"); // idle|normal|long|over30
+  const [speechJobId, setSpeechJobId] = useState(null);
+  const [speechJobStatus, setSpeechJobStatus] = useState("Idle");
+  const [speechProgress, setSpeechProgress] = useState({
+    totalChunks: 0,
+    completedChunks: 0,
+    currentChunk: 0,
+    percent: 0,
+    statusText: "",
+  });
+  const [forceSlowOffline, setForceSlowOffline] = useState(false);
 
+  // --- Copilot Chat ---
+  const [copilotMessages, setCopilotMessages] = useState([{role: 'assistant', content: 'Hi! I am your offline AI Copilot. Ask me anything!'}]);
+  const [copilotInput, setCopilotInput] = useState("");
+  const [copilotLoading, setCopilotLoading] = useState(false);
 
-  // User chooses duration only (no gap)
-  const [windowSec, setWindowSec] = useState(60); // default 1 minute
-  const [running, setRunning] = useState(false);
-  const [status, setStatus] = useState("Idle");
-  const [finalOutput, setFinalOutput] = useState("");
-  const [copied, setCopied] = useState(false);
-
-  // Internal scanning controls (minimum capture timings)
-  const minCheckMs = 250;     // how often we CHECK changes (cheap)
-  const minOcrCooldownMs = 1200; // minimum time between OCR runs (expensive)
-
-  // Refs for loop state
-  const stopRef = useRef(false);
-  const checkTimerRef = useRef(null);
-
-  const lastSigRef = useRef(null);            // last frame signature
-  const lastOcrAtRef = useRef(0);             // last OCR timestamp (real time ms)
-  const latestFullCodeRef = useRef("");       // last accepted full code
-  const tEndRef = useRef(0);                  // end time (video timeline seconds)
-
-  // ---------- helpers ----------
-  const getVideoTime = () => {
-    if (!videoPlayerRef?.current) return 0;
-    if (typeof videoPlayerRef.current.getCurrentTime === "function") {
-      return videoPlayerRef.current.getCurrentTime();
+  const handleCopilotSend = async () => {
+    if(!copilotInput.trim() || copilotLoading) return;
+    const userMsg = {role: 'user', content: copilotInput};
+    const newMessages = [...copilotMessages, userMsg];
+    setCopilotMessages(newMessages);
+    setCopilotInput("");
+    setCopilotLoading(true);
+  
+    try {
+       const reply = await window.api.chatCopilot(newMessages);
+       setCopilotMessages([...newMessages, {role: 'assistant', content: reply}]);
+    } catch(e) {
+       console.error(e);
+       setCopilotMessages([...newMessages, {role: 'assistant', content: 'Error: ' + e.message}]);
+    } finally {
+       setCopilotLoading(false);
     }
-    return 0;
   };
 
-  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-
-  // Very simple cleaning; later you will replace with your intelligent filter pipeline
-  const basicNormalize = (txt) =>
-    (txt || "")
-      .replace(/\r/g, "")
-      .split("\n")
-      .map((l) => l.trimEnd())
-      .join("\n")
-      .trim();
-
-  // Similarity check to avoid overwriting good code with tiny OCR noise
-  const similarityRatio = (a, b) => {
-    a = (a || "").trim();
-    b = (b || "").trim();
-    if (!a && !b) return 1;
-    if (!a || !b) return 0;
-    // quick ratio based on common length heuristic (cheap)
-    const minLen = Math.min(a.length, b.length);
-    const maxLen = Math.max(a.length, b.length);
-    let same = 0;
-    for (let i = 0; i < minLen; i++) if (a[i] === b[i]) same++;
-    return same / maxLen;
-  };
-
-  // ---------- frame signature (change detection) ----------
-  // Create a tiny grayscale "signature" array from the canvas
-  function computeSignature(canvas, w = 32, h = 32) {
-    const tmp = document.createElement("canvas");
-    tmp.width = w;
-    tmp.height = h;
-
-    const ctx = tmp.getContext("2d", { willReadFrequently: true });
-    ctx.drawImage(canvas, 0, 0, w, h);
-
-    const { data } = ctx.getImageData(0, 0, w, h);
-    const sig = new Uint8Array(w * h);
-
-    // grayscale signature
-    for (let i = 0, p = 0; i < data.length; i += 4, p++) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-      // integer grayscale approx
-      sig[p] = (r * 30 + g * 59 + b * 11) / 100;
-    }
-    return sig;
-  }
-
-  // Compare two signatures (0 = same, bigger = more different)
-  function signatureDiff(a, b) {
-    if (!a || !b || a.length !== b.length) return 1e9;
-    let sum = 0;
-    for (let i = 0; i < a.length; i++) sum += Math.abs(a[i] - b[i]);
-    return sum / a.length; // average abs difference 0..255
-  }
-
-  // Decide if frame changed enough to OCR
-  function isChangedEnough(prevSig, newSig) {
-    if (!prevSig) return true;
-    const diff = signatureDiff(prevSig, newSig);
-
-    // threshold: tune if needed
-    // ~0-2: almost same
-    // ~3-8: small change
-    // >8: significant change
-    return diff >= 6;
-  }
-
-  // ---------- OCR step ----------
-  const runOcrOnce = async () => {
-    if (!videoPlayerRef?.current || !roi) return;
-
-    const canvas = videoPlayerRef.current.getVideoFrame(roi);
-    if (!canvas) return;
-
-    // OCR
-    setStatus(`OCR running @ ${formatTime(getVideoTime())}...`);
-    const { data } = await Tesseract.recognize(canvas, "eng");
-    const raw = data?.text || "";
-    const normalized = basicNormalize(raw);
-
-    if (!normalized) return;
-
-    // If you later add transformers.js, it goes here:
-    // const refined = await refineWithTransformers(normalized);
-    // For now:
-    const refined = normalized;
-
-    const prev = latestFullCodeRef.current;
-    const sim = similarityRatio(prev, refined);
-
-    // If it's almost the same, ignore
-    if (sim >= 0.97) {
-      setStatus("OCR result ~same (ignored)");
-      return;
-    }
-
-    // Accept as new "full code snapshot"
-    // Merge this snapshot into accumulated full code (keeps correct order)
-    latestFullCodeRef.current = mergeCodeOrdered(
-      latestFullCodeRef.current,
-      refined
-    );
-    setStatus("Merged snapshot into full code");
-
-  };
-
-  // ---------- main scan loop ----------
-  const startWindowScan = async () => {
-    if (running) return;
-    if (!roi) {
-      setStatus("Select ROI first");
-      return;
-    }
-    if (!videoPlayerRef?.current) {
-      setStatus("Video player not ready");
-      return;
-    }
-
-    // reset
-    stopRef.current = false;
-    setRunning(true);
-    setFinalOutput("");
-    latestFullCodeRef.current = "";
-    lastSigRef.current = null;
-    lastOcrAtRef.current = 0;
-
-    const tStart = getVideoTime();
-    tEndRef.current = tStart + Number(windowSec);
-
-    setStatus(`Scanning ${windowSec}s from ${formatTime(tStart)} to ${formatTime(tEndRef.current)}...`);
-
-    // change-check loop
-    const tick = async () => {
-      if (stopRef.current) return;
-
-      const tNow = getVideoTime();
-      if (tNow >= tEndRef.current) {
-        // finish
-        setRunning(false);
-        stopRef.current = true;
-        const out = latestFullCodeRef.current;
-        setFinalOutput(out || "No code detected in this window.");
-        setStatus("Window scan complete");
-        return;
+  useImperativeHandle(ref, () => ({
+    autoStartServices: () => {
+      // 1. Auto-extract audio if haven't already
+      if (!speechLoading && speechChunks.length === 0 && !speechError) {
+        handleExtractAudio();
       }
-
-      // capture ROI frame and compute signature (cheap)
-      const canvas = videoPlayerRef.current.getVideoFrame(roi);
-      if (canvas) {
-        const sigNow = computeSignature(canvas, 32, 32);
-        const changed = isChangedEnough(lastSigRef.current, sigNow);
-        lastSigRef.current = sigNow;
-
-        const nowMs = Date.now();
-        const cooldownOk = nowMs - lastOcrAtRef.current >= minOcrCooldownMs;
-
-        if (changed && cooldownOk) {
-          lastOcrAtRef.current = nowMs;
-          try {
-            await runOcrOnce();
-          } catch (e) {
-            console.error(e);
-            setStatus("OCR error (check console)");
-          }
-        } else {
-          // optional status
-          if (!changed) setStatus(`No change @ ${formatTime(tNow)} (skipping)`);
-          else setStatus(`Changed but cooldown @ ${formatTime(tNow)} (waiting)`);
-        }
-      }
-
-      // schedule next tick
-      checkTimerRef.current = setTimeout(tick, minCheckMs);
-    };
-
-    tick();
-  };
-
-  const stopScan = () => {
-    stopRef.current = true;
-    setRunning(false);
-    setStatus("Stopped");
-    if (checkTimerRef.current) clearTimeout(checkTimerRef.current);
-    checkTimerRef.current = null;
-
-    // Show whatever latest code we have so far
-    const out = latestFullCodeRef.current;
-    setFinalOutput(out || "Stopped (no code captured yet).");
-  };
+    }
+  }), [speechLoading, speechChunks, speechError]);
 
   useEffect(() => {
-    return () => stopScan();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (!window.api?.onOfflineTranscriptionProgress) return;
+    
+    let lastUpdateTime = 0;
+    let pendingPayload = null;
+    let throttleTimer = null;
+
+    const processPayload = (payload) => {
+      const t = payload.type;
+      if (t === "job_started") {
+        setSpeechJobStatus("Running (long offline)");
+        setSpeechProgress((p) => ({
+          ...p,
+          totalChunks: payload.totalChunks || p.totalChunks,
+          completedChunks: payload.completedChunks || 0,
+          percent: payload.totalChunks ? Math.round((100 * (payload.completedChunks || 0)) / payload.totalChunks) : 0,
+          statusText: "Starting...",
+        }));
+      } else if (t === "stage") {
+        setSpeechProgress((p) => ({ ...p, statusText: payload.stage || p.statusText }));
+      } else if (t === "chunk_started") {
+        setSpeechProgress((p) => ({
+          ...p,
+          currentChunk: payload.currentChunk || p.currentChunk,
+          totalChunks: payload.totalChunks || p.totalChunks,
+          statusText: `Transcribing chunk ${payload.currentChunk || "?"}/${payload.totalChunks || "?"}...`,
+        }));
+      } else if (t === "chunk_completed") {
+        setSpeechProgress((p) => ({
+          ...p,
+          completedChunks: payload.completedChunks ?? p.completedChunks,
+          totalChunks: payload.totalChunks || p.totalChunks,
+          percent: payload.percent != null ? Math.round(payload.percent) : p.percent,
+          statusText: `Completed ${payload.completedChunks ?? p.completedChunks}/${payload.totalChunks || p.totalChunks}`,
+        }));
+      } else if (t === "job_paused") {
+        setSpeechJobStatus("Paused");
+        setSpeechProgress((p) => ({ ...p, statusText: "Paused" }));
+        setSpeechLoading(false);
+      } else if (t === "job_cancelled") {
+        setSpeechJobStatus("Cancelled");
+        setSpeechProgress((p) => ({ ...p, statusText: "Cancelled" }));
+        setSpeechLoading(false);
+      } else if (t === "chunk_failed") {
+        setSpeechJobStatus("Running (with errors)");
+        setSpeechProgress((p) => ({ ...p, statusText: `Chunk ${payload.chunkIndex} failed (will continue)` }));
+      } else if (t === "job_completed") {
+        setSpeechJobStatus("Completed");
+        setSpeechProgress((p) => ({ ...p, statusText: "Completed" }));
+        setSpeechLoading(false);
+        // Load segments only once finished (OK to keep in memory for searching)
+        if (window.api?.getOfflineTranscriptionSegments && speechJobId) {
+          window.api.getOfflineTranscriptionSegments(speechJobId).then((segments) => {
+            const mapped = (segments || []).map((s) => ({
+              text: s.text || "",
+              timestamp: [Number(s.start || 0), Number(s.end || 0)],
+              chunkIndex: s.chunkIndex,
+            }));
+            setSpeechChunks(mapped);
+          }).catch((e) => {
+            console.error(e);
+          });
+        }
+      }
+    };
+
+    const unsubscribe = window.api.onOfflineTranscriptionProgress((payload) => {
+      if (!payload) return;
+      if (speechJobId && payload.jobId !== speechJobId) return;
+
+      const now = Date.now();
+      const isUrgent = ["job_started", "job_completed", "job_paused", "job_cancelled", "chunk_failed"].includes(payload.type);
+
+      // Throttle rapid updates to max 1 per 250ms
+      if (isUrgent || now - lastUpdateTime > 250) {
+        if (throttleTimer) {
+          clearTimeout(throttleTimer);
+          throttleTimer = null;
+        }
+        lastUpdateTime = now;
+        processPayload(payload);
+      } else {
+        pendingPayload = payload;
+        if (!throttleTimer) {
+          throttleTimer = setTimeout(() => {
+            lastUpdateTime = Date.now();
+            throttleTimer = null;
+            if (pendingPayload) {
+              processPayload(pendingPayload);
+              pendingPayload = null;
+            }
+          }, 250);
+        }
+      }
+    });
+
+    return () => {
+      if (throttleTimer) clearTimeout(throttleTimer);
+      unsubscribe && unsubscribe();
+    };
+  }, [speechJobId]);
+
+  const handleExtractAudio = async () => {
+    if (!videoPlayerRef?.current) return;
+    const path = videoPlayerRef.current.getVideoPath();
+    if (!path) {
+      setSpeechError("Video file path not found. Please double check.");
+      return;
+    }
+
+    setSpeechLoading(true);
+    setSpeechError(null);
+    setSpeechChunks([]);
+    setSpeechMode("idle");
+    setSpeechJobStatus("Working...");
+    try {
+      // Ask main process which offline mode to use (normal/long/over30)
+      const jobInfo = await window.api.createOfflineTranscriptionJob({
+        videoPath: path,
+        chunkSec: 30,
+        modelPreset: "balanced",
+        enableVad: true,
+        allowOver30Min: forceSlowOffline,
+      });
+
+      if (jobInfo?.mode === "normal") {
+        setSpeechMode("normal");
+        setSpeechJobStatus("Running (normal offline)");
+        const chunks = await window.api.extractAudio(path);
+        setSpeechChunks(chunks || []);
+        setSpeechJobStatus("Completed");
+      } else if (jobInfo?.mode === "long") {
+        setSpeechMode("long");
+        setSpeechJobId(jobInfo.jobId);
+        setSpeechJobStatus("Queued (long offline)");
+        setSpeechProgress((p) => ({
+          ...p,
+          totalChunks: jobInfo.totalChunks || 0,
+          completedChunks: 0,
+          currentChunk: 0,
+          percent: 0,
+          statusText: "Starting worker...",
+        }));
+        await window.api.startOfflineTranscription(jobInfo.jobId);
+      } else if (jobInfo?.mode === "over30") {
+        setSpeechMode("over30");
+        setSpeechJobStatus("Too long (recommend online)");
+        setSpeechError(jobInfo.warning || "Video is longer than 30 minutes. Online mode recommended.");
+      } else {
+        throw new Error("Unknown transcription mode");
+      }
+    } catch (err) {
+      console.error(err);
+      setSpeechError(err.message || "Failed to extract audio");
+    } finally {
+      // For long jobs we keep loading=true until completion/pause/cancel
+      if (speechMode !== "long") setSpeechLoading(false);
+    }
+  };
+
+  const pauseLongSpeech = async () => {
+    if (!speechJobId) return;
+    try {
+      await window.api.pauseOfflineTranscription(speechJobId);
+    } catch (e) {
+      console.error(e);
+      setSpeechError(e.message || "Pause failed");
+    }
+  };
+  const resumeLongSpeech = async () => {
+    if (!speechJobId) return;
+    setSpeechLoading(true);
+    try {
+      await window.api.resumeOfflineTranscription(speechJobId);
+    } catch (e) {
+      console.error(e);
+      setSpeechError(e.message || "Resume failed");
+      setSpeechLoading(false);
+    }
+  };
+  const cancelLongSpeech = async () => {
+    if (!speechJobId) return;
+    try {
+      await window.api.cancelOfflineTranscription(speechJobId);
+    } catch (e) {
+      console.error(e);
+      setSpeechError(e.message || "Cancel failed");
+    }
+  };
+
+  const handleSpeechSeek = (timestamp) => {
+    if (!videoPlayerRef?.current || !timestamp) return;
+    videoPlayerRef.current.seekTo(timestamp[0]);
+  };
 
   return (
     <div className="sidebar">
       {/* Tab headers */}
       <div className="tabs">
-        {["Playlist", "Scene", "Code", "Info"].map((tab) => (
+        {["Playlist", "Scene", "Code", "Speech", "Copilot", "Info"].map((tab) => (
           <div
             key={tab}
             className={`tab ${activeTab === tab ? "active" : ""}`}
@@ -252,71 +269,172 @@ export default function Sidebar({ videoPlayerRef, roi }) {
       {/* Tab content */}
       <div className="tab-content">
         {activeTab === "Code" && (
-          <div className="code-card">
-            <div className="card-title">✨ OCR & Code Extraction</div>
+          <CodeExtractionPanel 
+            videoPlayerRef={videoPlayerRef} 
+            roi={roi} 
+            isSelectingRoi={isSelectingRoi} 
+            onRequestRoiSelect={onRequestRoiSelect} 
+            onCancelRoiSelect={onCancelRoiSelect}
+          />
+        )}
 
+        {activeTab === "Speech" && (
+          <div className="speech-card">
+            <div className="card-title">🎙️ Audio to Text Search</div>
             <div className="card-desc">
-              Select ROI on video → choose duration → Start.
+              Extract spoken text right from the video to search the timeline.
               <br />
-              App checks frames fast, OCR only when changed. Final full code shown at end.
+              <i>
+                Offline: 0–10 min normal. 10–30 min long mode (chunked background). 30+ min: online recommended.
+              </i>
             </div>
 
-            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              <label style={{ color: "#9ca3af", fontSize: 12 }}>Duration</label>
-              <select
-                value={windowSec}
-                onChange={(e) => setWindowSec(Number(e.target.value))}
-                disabled={running}
-                style={{ padding: "6px 8px", borderRadius: 6 }}
-              >
-                <option value={10}>10 sec</option>
-                <option value={30}>30 sec</option>
-                <option value={60}>1 min</option>
-                <option value={120}>2 min</option>
-              </select>
-
-              <button className="extract-btn" onClick={startWindowScan} disabled={!roi || running}>
-                ▶ Start Window Scan
+            <div style={{ marginTop: 10 }}>
+              <button className="extract-btn" onClick={handleExtractAudio} disabled={speechLoading}>
+                {speechLoading ? "Processing..." : "▶ Extract Audio to Text (Offline)"}
               </button>
-
-              <button className="extract-btn" onClick={stopScan} disabled={!running}>
-                ⏹ Stop
-              </button>
-
-              <button
-                className="extract-btn"
-                onClick={async () => {
-                  if (!finalOutput) return;
-                  await navigator.clipboard.writeText(finalOutput);
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 1200);
-                }}
-                disabled={!finalOutput}
-              >
-                📋 {copied ? "Copied!" : "Copy"}
-              </button>
-
             </div>
 
-            {!roi && (
-              <div style={{ marginTop: 10, color: "#fbbf24", fontSize: 12 }}>
-                Select ROI on the video first (drag rectangle over code area).
+            <div style={{ marginTop: 10, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <label style={{ color: "#9ca3af", fontSize: 12 }}>
+                <input
+                  type="checkbox"
+                  checked={forceSlowOffline}
+                  onChange={(e) => setForceSlowOffline(e.target.checked)}
+                  disabled={speechLoading}
+                  style={{ marginRight: 6 }}
+                />
+                Allow slow offline for 30+ minutes (not recommended)
+              </label>
+              {speechMode === "long" && (
+                <>
+                  <button className="extract-btn" onClick={pauseLongSpeech} disabled={!speechJobId || !speechLoading}>
+                    ⏸ Pause
+                  </button>
+                  <button className="extract-btn" onClick={resumeLongSpeech} disabled={!speechJobId || speechLoading}>
+                    ▶ Resume
+                  </button>
+                  <button className="extract-btn" onClick={cancelLongSpeech} disabled={!speechJobId}>
+                    ✖ Cancel
+                  </button>
+                </>
+              )}
+            </div>
+
+            <div style={{ marginTop: 10, color: "#9ca3af", fontSize: 12 }}>
+              Status: {speechJobStatus}
+              {speechMode === "long" && speechProgress.totalChunks > 0 && (
+                <>
+                  <br />
+                  Progress: {speechProgress.completedChunks}/{speechProgress.totalChunks} (
+                  {speechProgress.percent}%){speechProgress.currentChunk ? ` | current ${speechProgress.currentChunk}` : ""}
+                  <br />
+                  {speechProgress.statusText}
+                </>
+              )}
+            </div>
+
+            {speechError && (
+              <div style={{ marginTop: 10, color: "#ef4444", fontSize: 13 }}>
+                Error: {speechError}
               </div>
             )}
 
-            <div style={{ marginTop: 10, color: "#9ca3af", fontSize: 12 }}>
-              Status: {status}
-            </div>
+            {speechChunks.length > 0 && (
+              <div style={{ marginTop: 15 }}>
+                <input
+                  type="text"
+                  placeholder="Search spoken words..."
+                  value={speechSearchTerm}
+                  onChange={(e) => setSpeechSearchTerm(e.target.value)}
+                  style={{
+                    width: "100%", padding: "8px", borderRadius: "6px",
+                    background: "#374151", color: "white", border: "1px solid #4b5563"
+                  }}
+                />
+                <div style={{ marginTop: 10, maxHeight: "300px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
+                  {speechChunks
+                    .filter(c => (c.text||"").toLowerCase().includes(speechSearchTerm.toLowerCase()))
+                    .map((chunk, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          background: "#1f2937", padding: "10px", borderRadius: "6px",
+                          cursor: "pointer", border: "1px solid transparent"
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.borderColor = "#60a5fa"}
+                        onMouseLeave={(e) => e.currentTarget.style.borderColor = "transparent"}
+                        onClick={() => handleSpeechSeek(chunk.timestamp)}
+                      >
+                        <div style={{ color: "#60a5fa", fontSize: 12, marginBottom: 4 }}>
+                          {formatTime(chunk.timestamp[0])} - {formatTime(chunk.timestamp[1])}
+                        </div>
+                        <div style={{ color: "#e5e7eb", fontSize: 14 }}>
+                          {chunk.text}
+                        </div>
+                      </div>
+                  ))}
+                  {speechChunks.filter(c => (c.text||"").toLowerCase().includes(speechSearchTerm.toLowerCase())).length === 0 && (
+                    <div style={{ color: "#9ca3af", fontStyle: "italic", fontSize: 13 }}>No matches found.</div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
-            <div className="output-area" style={{ whiteSpace: "pre-wrap" }}>
-              {finalOutput || "Final code will appear here after the scan ends..."}
+        {activeTab === "Copilot" && (
+          <div className="copilot-card">
+            <div className="card-title">🤖 Offline Copilot</div>
+            <div className="card-desc">Ask questions locally. No data leaves your machine. <br/><i>Note: Offline AI runs purely on your CPU and can take 15-30 seconds to type a response.</i></div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', height: '350px', marginTop: 10 }}>
+              <div style={{ flex: 1, overflowY: 'auto', background: '#1f2937', borderRadius: '6px', padding: '10px', marginBottom: '10px', border: '1px solid #374151' }}>
+                {copilotMessages.map((msg, idx) => (
+                  <div key={idx} style={{ marginBottom: 10, textAlign: msg.role === 'user' ? 'right' : 'left' }}>
+                     <span style={{ 
+                       display: 'inline-block', 
+                       padding: '8px 12px', 
+                       borderRadius: '8px', 
+                       background: msg.role === 'user' ? '#3b82f6' : '#374151',
+                       color: '#fff',
+                       maxWidth: '90%',
+                       wordWrap: 'break-word',
+                       whiteSpace: 'pre-wrap'
+                     }}>
+                       {msg.content}
+                     </span>
+                  </div>
+                ))}
+                {copilotLoading && (
+                  <div style={{ textAlign: 'left', color: '#9ca3af', fontSize: '13px', fontStyle: 'italic', marginTop: 10 }}>
+                    Copilot is thinking... (may take ~5 minutes if first run)
+                  </div>
+                )}
+              </div>
+              
+              <div style={{ display: 'flex', gap: 5 }}>
+                <input 
+                   type="text" 
+                   value={copilotInput}
+                   onChange={e => setCopilotInput(e.target.value)}
+                   onKeyDown={e => e.key === 'Enter' && handleCopilotSend()}
+                   placeholder="Ask a question..."
+                   style={{ flex: 1, padding: '8px', borderRadius: '6px', background: '#374151', color: 'white', border: '1px solid #4b5563' }}
+                />
+                <button className="extract-btn" onClick={handleCopilotSend} disabled={copilotLoading}>
+                   Send
+                </button>
+              </div>
             </div>
           </div>
         )}
       </div>
     </div>
   );
-}
+});
+
+export default Sidebar;
 
 function formatTime(sec) {
   const s = Math.floor(sec || 0);
@@ -324,82 +442,3 @@ function formatTime(sec) {
   const r = s % 60;
   return `${m}:${String(r).padStart(2, "0")}`;
 }
-function normalizeLine(line) {
-  return (line || "").replace(/\s+/g, " ").trim();
-}
-
-// Ordered merge so insert-above keeps correct order
-function mergeCodeOrdered(oldCode, newCode) {
-  const oldLinesRaw = (oldCode || "").split("\n").filter(l => l.trim() !== "");
-  const newLinesRaw = (newCode || "").split("\n").filter(l => l.trim() !== "");
-
-  if (oldLinesRaw.length === 0) return newLinesRaw.join("\n");
-  if (newLinesRaw.length === 0) return oldLinesRaw.join("\n");
-
-  const oldNorm = oldLinesRaw.map(normalizeLine);
-  const newNorm = newLinesRaw.map(normalizeLine);
-
-  const n = oldNorm.length;
-  const m = newNorm.length;
-
-  const dp = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
-  for (let i = 1; i <= n; i++) {
-    for (let j = 1; j <= m; j++) {
-      if (oldNorm[i - 1] === newNorm[j - 1]) dp[i][j] = dp[i - 1][j - 1] + 1;
-      else dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
-    }
-  }
-
-  const pairs = [];
-  let i = n, j = m;
-  while (i > 0 && j > 0) {
-    if (oldNorm[i - 1] === newNorm[j - 1]) {
-      pairs.push([i - 1, j - 1]);
-      i--; j--;
-    } else if (dp[i - 1][j] >= dp[i][j - 1]) i--;
-    else j--;
-  }
-  pairs.reverse();
-
-  const usedOld = new Array(n).fill(false);
-  for (const [oi] of pairs) usedOld[oi] = true;
-
-  const merged = [];
-  let oldCursor = 0;
-
-  for (let newIdx = 0; newIdx < m; newIdx++) {
-    const pair = pairs.find(p => p[1] === newIdx);
-    if (pair) {
-      const anchorOldIdx = pair[0];
-
-      while (oldCursor < anchorOldIdx) {
-        if (!usedOld[oldCursor]) merged.push(oldLinesRaw[oldCursor]);
-        oldCursor++;
-      }
-
-      merged.push(newLinesRaw[newIdx]);
-      oldCursor = anchorOldIdx + 1;
-    } else {
-      merged.push(newLinesRaw[newIdx]);
-    }
-  }
-
-  while (oldCursor < n) {
-    if (!usedOld[oldCursor]) merged.push(oldLinesRaw[oldCursor]);
-    oldCursor++;
-  }
-
-  // dedup by normalized line
-  const seen = new Set();
-  const out = [];
-  for (const line of merged) {
-    const key = normalizeLine(line);
-    if (!key) continue;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(line);
-  }
-
-  return out.join("\n");
-}
-

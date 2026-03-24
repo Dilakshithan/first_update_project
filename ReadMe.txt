@@ -1,112 +1,111 @@
 Empty One - Video Player App
 ============================
 
-A desktop video player built with Electron, React, and Vite.
-Supports playing local video files with controls: play/pause, stop, timeline, volume, fullscreen, screenshot, and a sidebar.
+A desktop media player built with Electron + React + Vite, including:
+- Video playback controls
+- OCR/code extraction
+- Speech transcription search (short and long offline modes)
 
 ------------------------------------------------------------
-1. Prerequisites
+1. Prerequisites (for another computer)
 ------------------------------------------------------------
 
-Before running the project, make sure you have:
+Install these first:
 
-1. Node.js (v18 or higher) installed
+1) Node.js 18+ (recommended 20+)
    - Download: https://nodejs.org/
-   - Check installation in terminal/command prompt:
+   - Verify:
      node -v
      npm -v
 
-2. A terminal or command-line tool to run commands.
+2) Python 3.10+ (required for long-video offline transcription worker)
+   - Verify:
+     python --version
+
+3) Internet access for first-time model download (if model files are not bundled)
+
+Note:
+- ffmpeg and ffprobe binaries are provided by npm packages (`ffmpeg-static`, `ffprobe-static`),
+  so users do not need to install system ffmpeg manually for normal use.
 
 ------------------------------------------------------------
-2. Project Dependencies (dont need to install it automatically install)
+2. Clone and install
 ------------------------------------------------------------
 
-The project dependencies are listed in package.json. They include:
-
-Main Dependencies:
-- electron 40.2.1        : Desktop app runtime
-- react 19.2.4           : Frontend UI library
-- react-dom 19.2.4       : React DOM renderer
-- @vitejs/plugin-react 5.1.3 : React plugin for Vite
-- electron-squirrel-startup 1.0.1 : Windows installer support
-
-Dev Dependencies:
-- vite 5.4.21            : Development server and bundler
-- @electron-forge/cli 7.11.1 : Electron Forge CLI
-- @electron-forge/maker-zip 7.11.1 : Package app as ZIP
-- @electron-forge/maker-squirrel 7.11.1 : Windows installer builder
-- @electron-forge/maker-deb 7.11.1     : Linux .deb package builder
-- @electron-forge/maker-rpm 7.11.1     : Linux .rpm package builder
-- @electron-forge/plugin-auto-unpack-natives 7.11.1 : Handles native dependencies
-- @electron-forge/plugin-fuses 7.11.1 : Optimizes builds
-- @electron/fuses 1.8.0   : Optimizer for Electron
-
-All dependencies are installed automatically with 'npm install'.
-
-------------------------------------------------------------
-3. Installation / Setup
-------------------------------------------------------------
-
-1. Clone or download the project folder:
+1) Clone the repo and open project:
    git clone <your-repo-link>
-   cd empty_one
+   cd uni_project_media_player
 
-2. Install all dependencies:
+2) Install Node dependencies:
    npm install
 
-This will download Electron, React, Vite, and all required plugins.
+3) Install Python dependencies (for long offline jobs 10-30 min):
+   python -m pip install -r python/requirements.txt
 
 ------------------------------------------------------------
-4. Running the App
+3. Run the app
 ------------------------------------------------------------
 
-Start the Electron app with:
+Start development app:
 
    npm start
 
-- Opens the Electron window with your video player.
-- Click "File -> Open File" or "Select Video File" to load a video.
-- Controls (play/pause, timeline, volume, fullscreen, screenshot) are always visible.
-
 ------------------------------------------------------------
-5. Building / Packaging
+4. Offline transcription modes
 ------------------------------------------------------------
 
-To create a packaged app:
+- 0-10 min: normal offline mode (fast path in Electron main process)
+- 10-30 min: long-video offline mode (chunked background Python worker)
+- 30+ min: online mode recommended (slow offline can be enabled optionally)
 
+Long-video mode features:
+- Chunked processing (default 30s chunks)
+- Progress reporting
+- Pause / Resume / Cancel
+- Resume from last completed chunk
+- Intermediate results saved after each chunk
+
+------------------------------------------------------------
+5. Main dependencies
+------------------------------------------------------------
+
+Automatically installed by `npm install`:
+- electron
+- react, react-dom
+- @xenova/transformers
+- fluent-ffmpeg
+- ffmpeg-static
+- ffprobe-static
+- tesseract.js
+
+Python packages (installed separately):
+- faster-whisper
+- torch
+
+------------------------------------------------------------
+6. Build / package
+------------------------------------------------------------
+
+Package app:
    npm run package
 
-- Outputs a packaged app in the 'out' folder.
-
-For platform-specific installers:
-
+Create installers:
    npm run make
 
-- Creates .exe (Windows), .zip, .deb/.rpm (Linux) installers based on configuration.
-
 ------------------------------------------------------------
-6. Features
+7. Troubleshooting
 ------------------------------------------------------------
 
-- Play / Pause / Stop controls
-- Timeline slider
-- Volume control
-- Fullscreen toggle
-- Screenshot capture
-- Sidebar for additional options
-- Open local video files from File menu or drag and drop
+If long offline transcription fails:
+- Check Python is installed: `python --version`
+- Install worker deps again:
+  `python -m pip install -r python/requirements.txt`
+- Restart app after dependency install.
 
-------------------------------------------------------------
-7. Troubleshooting / Notes
-------------------------------------------------------------
-
-- Recommended Node.js version: v18 or higher
-- Electron apps must be started with 'npm start' (cannot just open index.html)
-- If dependencies break:
-   rm -rf node_modules package-lock.json
-   npm install
-   npm start
+If npm dependencies are broken:
+  delete node_modules and package-lock.json
+  npm install
+  npm start
 
 ------------------------------------------------------------
 8. Contact

@@ -8,15 +8,54 @@ import React, {
 import "./VideoPlayer.css";
 import RoiSelector from "./RoiSelector";
 
-const VideoPlayer = forwardRef(function VideoPlayer({ roi, onRoiChange }, ref) {
+const VideoPlayer = forwardRef(function VideoPlayer({ roi, onRoiChange, onPlay, isSelectingRoi }, ref) {
   const videoRef = useRef(null);
   const fileInputRef = useRef(null);
 
   const [videoSrc, setVideoSrc] = useState(null);
+  const videoPathRef = useRef(null);//          /////////////
   const [duration, setDuration] = useState(0);
   const [current, setCurrent] = useState(0);
   const [volume, setVolume] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
+
+  const toVideoNormalizedRoi = (overlayRoi) => {
+    const video = videoRef.current;
+    if (!video || !overlayRoi) return null;
+
+    const cw = video.clientWidth;
+    const ch = video.clientHeight;
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    if (!cw || !ch || !vw || !vh) return null;
+
+    // Match object-fit: contain geometry used by the video element.
+    const scale = Math.min(cw / vw, ch / vh);
+    const renderW = vw * scale;
+    const renderH = vh * scale;
+    const renderLeft = (cw - renderW) / 2;
+    const renderTop = (ch - renderH) / 2;
+
+    const roiLeft = overlayRoi.x * cw;
+    const roiTop = overlayRoi.y * ch;
+    const roiRight = roiLeft + overlayRoi.w * cw;
+    const roiBottom = roiTop + overlayRoi.h * ch;
+
+    // Clamp ROI to visible video rectangle (ignore black bars / controls overlap).
+    const ix1 = Math.max(renderLeft, roiLeft);
+    const iy1 = Math.max(renderTop, roiTop);
+    const ix2 = Math.min(renderLeft + renderW, roiRight);
+    const iy2 = Math.min(renderTop + renderH, roiBottom);
+
+    if (ix2 <= ix1 || iy2 <= iy1) return null;
+
+    const x = (ix1 - renderLeft) / renderW;
+    const y = (iy1 - renderTop) / renderH;
+    const w = (ix2 - ix1) / renderW;
+    const h = (iy2 - iy1) / renderH;
+
+    return { x, y, w, h };
+  };
 
   // ✅ open file dialog (used by Header)
   const openFileDialog = () => fileInputRef.current?.click();
@@ -30,6 +69,7 @@ const VideoPlayer = forwardRef(function VideoPlayer({ roi, onRoiChange }, ref) {
 
     const url = URL.createObjectURL(file);
     setVideoSrc(url);
+    videoPathRef.current = window.api?.getFilePath ? window.api.getFilePath(file) : (file.path || null);
 
     // Reset UI states
     setCurrent(0);
@@ -59,20 +99,23 @@ const VideoPlayer = forwardRef(function VideoPlayer({ roi, onRoiChange }, ref) {
 
     const onLoaded = () => setDuration(v.duration || 0);
     const onTime = () => setCurrent(v.currentTime || 0);
-    const onPlay = () => setIsPlaying(true);
+    const onPlayEvent = () => {
+      setIsPlaying(true);
+      if (onPlay) onPlay();
+    };
     const onPause = () => setIsPlaying(false);
     const onEnded = () => setIsPlaying(false);
 
     v.addEventListener("loadedmetadata", onLoaded);
     v.addEventListener("timeupdate", onTime);
-    v.addEventListener("play", onPlay);
+    v.addEventListener("play", onPlayEvent);
     v.addEventListener("pause", onPause);
     v.addEventListener("ended", onEnded);
 
     return () => {
       v.removeEventListener("loadedmetadata", onLoaded);
       v.removeEventListener("timeupdate", onTime);
-      v.removeEventListener("play", onPlay);
+      v.removeEventListener("play", onPlayEvent);
       v.removeEventListener("pause", onPause);
       v.removeEventListener("ended", onEnded);
     };
@@ -120,6 +163,7 @@ const VideoPlayer = forwardRef(function VideoPlayer({ roi, onRoiChange }, ref) {
   // ✅ expose APIs to parent/Sidebar
   useImperativeHandle(ref, () => ({
     openFileDialog,
+    getVideoPath: () => videoPathRef.current,
 
     getVideoFrame: (roiNorm) => {
       const video = videoRef.current;
@@ -182,7 +226,16 @@ const VideoPlayer = forwardRef(function VideoPlayer({ roi, onRoiChange }, ref) {
         />
 
         {/* ROI overlay only when a video is loaded */}
-        {videoSrc && <RoiSelector enabled={true} onChange={onRoiChange} />}
+        {videoSrc && (
+          <RoiSelector
+            enabled={Boolean(isSelectingRoi)}
+            currentRoi={roi}
+            onChange={(overlayRoi) => {
+              const mapped = toVideoNormalizedRoi(overlayRoi);
+              if (mapped) onRoiChange?.(mapped);
+            }}
+          />
+        )}
 
         {!videoSrc && (
           <div className="empty-state">

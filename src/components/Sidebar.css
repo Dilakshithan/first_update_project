@@ -73,7 +73,15 @@
 .extract-btn:hover {
   opacity: 0.9;
 }
+.extract-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 
+.extract-btn.stop-mode {
+  background-color: #ef4444;
+  color: #ffffff;
+}
 .output-area {
   height: 320px;          /* increase height (change as you like) */
   max-height: 420px;      /* optional limit */
