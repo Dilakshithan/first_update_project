@@ -12,9 +12,77 @@
 
 .roi-rect {
   position: absolute;
-  border: 2px solid #3b82f6;
-  background: rgba(59, 130, 246, 0.12);
-  border-radius: 6px;
+  /* Remove background fill to keep it completely transparent inside */
+  background: transparent;
+  border-radius: 12px;
+  pointer-events: none; /* Do not block interaction underneath */
+}
+
+/* Outer animated gradient border using masking */
+.roi-rect::before {
+  content: "";
+  position: absolute;
+  /* Extrude outward to form the border thickness */
+  inset: -2px;
+  border-radius: 14px; /* Slightly larger inner corner */
+  padding: 2px; /* Border width */
+
+  /* Looping Multi-Color Gradient */
+  background: linear-gradient(
+    90deg,
+    cyan,
+    #00ff88, /* Green */
+    #ffeb3b, /* Yellow */
+    #ff9800, /* Orange */
+    #ff0080, /* Pink */
+    #b000ff, /* Purple */
+    cyan     /* Loop back to cyan */
+  );
+  background-size: 200% 100%;
+  animation: roi-border-flow 3s linear infinite;
+
+  /* Use mask to punch out the center, leaving only the border */
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Subtle glow outside the border */
+.roi-rect::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 14px;
+  background: linear-gradient(
+    90deg,
+    cyan,
+    #00ff88,
+    #ffeb3b,
+    #ff9800,
+    #ff0080,
+    #b000ff,
+    cyan
+  );
+  background-size: 200% 100%;
+  /* Combine flow animation with a subtle glowing pulse */
+  animation: 
+    roi-border-flow 3s linear infinite,
+    roi-glow-pulse 2s ease-in-out infinite alternate;
+  filter: blur(10px);
+  z-index: -1;
+  pointer-events: none;
+}
+
+@keyframes roi-border-flow {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; } /* Smooth loop */
+}
+
+@keyframes roi-glow-pulse {
+  0% { opacity: 0.4; filter: blur(8px); }
+  100% { opacity: 0.8; filter: blur(14px); }
 }
 
 .roi-hint {
