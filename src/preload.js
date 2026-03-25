@@ -2,6 +2,10 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 
 contextBridge.exposeInMainWorld('api', {
   extractAudio: (path) => ipcRenderer.invoke('extract-audio', path),
+  transcribeVideoOnline: (params) => ipcRenderer.invoke('transcription/transcribeOnline', params),
+  getOpenAiKeyStatus: () => ipcRenderer.invoke('transcription/getOpenAiKeyStatus'),
+  testOpenAiKey: (params) => ipcRenderer.invoke('transcription/testOpenAiKey', params),
+  saveOpenAiKeyToDotEnv: (params) => ipcRenderer.invoke('transcription/saveOpenAiKeyToDotEnv', params),
   chatCopilot: (messages) => ipcRenderer.invoke('chat-copilot', messages),
   extractCodeOnline: (base64Image) => ipcRenderer.invoke('extract-code-online', base64Image),
   mergeCodeOnline: (framesList) => ipcRenderer.invoke('merge-code-online', framesList),

@@ -11,7 +11,7 @@ const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRo
   const [speechChunks, setSpeechChunks] = useState([]);
   const [speechSearchTerm, setSpeechSearchTerm] = useState("");
   const [speechError, setSpeechError] = useState(null);
-  const [speechMode, setSpeechMode] = useState("idle"); // idle|normal|long|over30
+  const [speechMode, setSpeechMode] = useState("idle"); // idle|normal|long|online
   const [speechJobId, setSpeechJobId] = useState(null);
   const [speechJobStatus, setSpeechJobStatus] = useState("Idle");
   const [speechProgress, setSpeechProgress] = useState({
@@ -21,7 +21,7 @@ const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRo
     percent: 0,
     statusText: "",
   });
-  const [forceSlowOffline, setForceSlowOffline] = useState(false);
+  // State unified with extractionMode global prop.
 
   // --- Copilot Chat ---
   const [copilotMessages, setCopilotMessages] = useState([{ role: 'assistant', content: 'Hi! I am your offline AI Copilot. Ask me anything!' }]);
@@ -54,7 +54,7 @@ const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRo
         handleExtractAudio();
       }
     }
-  }), [speechLoading, speechChunks, speechError]);
+  }), [speechLoading, speechChunks, speechError, extractionMode]);
 
   useEffect(() => {
     if (!window.api?.onOfflineTranscriptionProgress) return;
@@ -65,6 +65,24 @@ const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRo
 
     const processPayload = (payload) => {
       const t = payload.type;
+      const activeJob = payload.jobId;
+
+      const mergeSegmentsIntoChunks = (jobId) => {
+        if (!jobId || !window.api?.getOfflineTranscriptionSegments) return;
+        window.api
+          .getOfflineTranscriptionSegments(jobId)
+          .then((segments) => {
+            const mapped = (segments || []).map((s) => ({
+              text: s.text || "",
+              timestamp: [Number(s.start || 0), Number(s.end || 0)],
+              chunkIndex: s.chunkIndex,
+            }));
+            mapped.sort((a, b) => (a.chunkIndex ?? 0) - (b.chunkIndex ?? 0));
+            setSpeechChunks(mapped);
+          })
+          .catch(() => {});
+      };
+
       if (t === "job_started") {
         setSpeechJobStatus("Running (long offline)");
         setSpeechProgress((p) => ({
@@ -91,6 +109,7 @@ const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRo
           percent: payload.percent != null ? Math.round(payload.percent) : p.percent,
           statusText: `Completed ${payload.completedChunks ?? p.completedChunks}/${payload.totalChunks || p.totalChunks}`,
         }));
+        mergeSegmentsIntoChunks(activeJob);
       } else if (t === "job_paused") {
         setSpeechJobStatus("Paused");
         setSpeechProgress((p) => ({ ...p, statusText: "Paused" }));
@@ -102,23 +121,26 @@ const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRo
       } else if (t === "chunk_failed") {
         setSpeechJobStatus("Running (with errors)");
         setSpeechProgress((p) => ({ ...p, statusText: `Chunk ${payload.chunkIndex} failed (will continue)` }));
+      } else if (t === "error") {
+        setSpeechJobStatus("Error");
+        setSpeechProgress((p) => ({ ...p, statusText: "Error" }));
+        setSpeechError(payload.message || "Unknown worker error");
+        setSpeechLoading(false);
+      } else if (t === "worker_exit") {
+        setSpeechLoading((prevLoading) => {
+          // If it was still loading but the worker died, it crashed or was killed
+          if (prevLoading) {
+             setSpeechJobStatus(payload.code === 0 ? "Completed" : "Worker Stopped");
+             setSpeechProgress((p) => ({ ...p, statusText: `Worker stopped (code ${payload.code})` }));
+             if (payload.code !== 0 && !speechError) setSpeechError(`Transcription worker missing or crashed (code: ${payload.code}). Make sure Python and 'faster-whisper' are correctly installed!`);
+          }
+          return false;
+        });
       } else if (t === "job_completed") {
         setSpeechJobStatus("Completed");
         setSpeechProgress((p) => ({ ...p, statusText: "Completed" }));
         setSpeechLoading(false);
-        // Load segments only once finished (OK to keep in memory for searching)
-        if (window.api?.getOfflineTranscriptionSegments && speechJobId) {
-          window.api.getOfflineTranscriptionSegments(speechJobId).then((segments) => {
-            const mapped = (segments || []).map((s) => ({
-              text: s.text || "",
-              timestamp: [Number(s.start || 0), Number(s.end || 0)],
-              chunkIndex: s.chunkIndex,
-            }));
-            setSpeechChunks(mapped);
-          }).catch((e) => {
-            console.error(e);
-          });
-        }
+        mergeSegmentsIntoChunks(activeJob);
       }
     };
 
@@ -127,7 +149,14 @@ const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRo
       if (speechJobId && payload.jobId !== speechJobId) return;
 
       const now = Date.now();
-      const isUrgent = ["job_started", "job_completed", "job_paused", "job_cancelled", "chunk_failed"].includes(payload.type);
+      const isUrgent = [
+        "job_started",
+        "job_completed",
+        "job_paused",
+        "job_cancelled",
+        "chunk_failed",
+        "chunk_completed",
+      ].includes(payload.type);
 
       // Throttle rapid updates to max 1 per 250ms
       if (isUrgent || now - lastUpdateTime > 250) {
@@ -158,6 +187,41 @@ const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRo
     };
   }, [speechJobId]);
 
+  const runOfflineTranscription = async (videoPath) => {
+    // Ask main process which offline mode to use (normal vs long / Python worker)
+    const jobInfo = await window.api.createOfflineTranscriptionJob({
+      videoPath,
+      chunkSec: 45,
+      modelPreset: "fast",
+      enableVad: true,
+    });
+
+    if (jobInfo?.mode === "normal") {
+      setSpeechMode("normal");
+      setSpeechJobStatus("Running (normal offline)");
+      const chunks = await window.api.extractAudio(videoPath);
+      setSpeechChunks(chunks || []);
+      setSpeechJobStatus("Completed");
+      return false;
+    }
+    if (jobInfo?.mode === "long") {
+      setSpeechMode("long");
+      setSpeechJobId(jobInfo.jobId);
+      setSpeechJobStatus("Queued (long offline)");
+      setSpeechProgress((p) => ({
+        ...p,
+        totalChunks: jobInfo.totalChunks || 0,
+        completedChunks: 0,
+        currentChunk: 0,
+        percent: 0,
+        statusText: "Starting worker...",
+      }));
+      await window.api.startOfflineTranscription(jobInfo.jobId);
+      return true;
+    }
+    throw new Error("Unknown transcription mode");
+  };
+
   const handleExtractAudio = async () => {
     if (!videoPlayerRef?.current) return;
     const path = videoPlayerRef.current.getVideoPath();
@@ -171,48 +235,39 @@ const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRo
     setSpeechChunks([]);
     setSpeechMode("idle");
     setSpeechJobStatus("Working...");
+    let longJobStarted = false;
     try {
-      // Ask main process which offline mode to use (normal/long/over30)
-      const jobInfo = await window.api.createOfflineTranscriptionJob({
-        videoPath: path,
-        chunkSec: 30,
-        modelPreset: "balanced",
-        enableVad: true,
-        allowOver30Min: forceSlowOffline,
-      });
-
-      if (jobInfo?.mode === "normal") {
-        setSpeechMode("normal");
-        setSpeechJobStatus("Running (normal offline)");
-        const chunks = await window.api.extractAudio(path);
-        setSpeechChunks(chunks || []);
-        setSpeechJobStatus("Completed");
-      } else if (jobInfo?.mode === "long") {
-        setSpeechMode("long");
-        setSpeechJobId(jobInfo.jobId);
-        setSpeechJobStatus("Queued (long offline)");
-        setSpeechProgress((p) => ({
-          ...p,
-          totalChunks: jobInfo.totalChunks || 0,
-          completedChunks: 0,
-          currentChunk: 0,
-          percent: 0,
-          statusText: "Starting worker...",
-        }));
-        await window.api.startOfflineTranscription(jobInfo.jobId);
-      } else if (jobInfo?.mode === "over30") {
-        setSpeechMode("over30");
-        setSpeechJobStatus("Too long (recommend online)");
-        setSpeechError(jobInfo.warning || "Video is longer than 30 minutes. Online mode recommended.");
-      } else {
-        throw new Error("Unknown transcription mode");
+      if (extractionMode === "online") {
+        setSpeechMode("online");
+        setSpeechJobStatus("Online requested — trying cloud first...");
+        try {
+          const chunks = await window.api.transcribeVideoOnline({
+            videoPath: path,
+            apiKey: undefined,
+          });
+          setSpeechChunks(chunks || []);
+          setSpeechJobStatus("Completed (online)");
+          return;
+        } catch (onlineErr) {
+          const msg = String(onlineErr?.message || onlineErr || "").toLowerCase();
+          const shouldFallback =
+            msg.includes("api key missing") ||
+            msg.includes("401") ||
+            msg.includes("403");
+          if (!shouldFallback) throw onlineErr;
+          setSpeechError(null);
+          setSpeechJobStatus("Online unavailable. Auto-switching to offline...");
+          longJobStarted = await runOfflineTranscription(path);
+          return;
+        }
       }
+
+      longJobStarted = await runOfflineTranscription(path);
     } catch (err) {
       console.error(err);
       setSpeechError(err.message || "Failed to extract audio");
     } finally {
-      // For long jobs we keep loading=true until completion/pause/cancel
-      if (speechMode !== "long") setSpeechLoading(false);
+      if (!longJobStarted) setSpeechLoading(false);
     }
   };
 
@@ -287,27 +342,29 @@ const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRo
               Extract spoken text right from the video to search the timeline.
               <br />
               <i>
-                Offline: 0–10 min normal. 10–30 min long mode (chunked background). 30+ min: online recommended.
+                Offline Mode: Uses local Whisper (no data sent). Online Mode: Uses fast cloud transcription via Groq AI.
               </i>
             </div>
 
+            {extractionMode === "online" && (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ marginTop: 6, color: "#9ca3af", fontSize: 11 }}>
+                  Online mode automatically falls back to offline if the API key or quota fails.
+                </div>
+              </div>
+            )}
+
             <div style={{ marginTop: 10 }}>
               <button className="extract-btn" onClick={handleExtractAudio} disabled={speechLoading}>
-                {speechLoading ? "Processing..." : "▶ Extract Audio to Text (Offline)"}
+                {speechLoading
+                  ? "Processing..."
+                  : extractionMode === "online"
+                    ? "▶ Extract Audio to Text (Online)"
+                    : "▶ Extract Audio to Text (Offline)"}
               </button>
             </div>
 
             <div style={{ marginTop: 10, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              <label style={{ color: "#9ca3af", fontSize: 12 }}>
-                <input
-                  type="checkbox"
-                  checked={forceSlowOffline}
-                  onChange={(e) => setForceSlowOffline(e.target.checked)}
-                  disabled={speechLoading}
-                  style={{ marginRight: 6 }}
-                />
-                Allow slow offline for 30+ minutes (not recommended)
-              </label>
               {speechMode === "long" && (
                 <>
                   <button className="extract-btn" onClick={pauseLongSpeech} disabled={!speechJobId || !speechLoading}>

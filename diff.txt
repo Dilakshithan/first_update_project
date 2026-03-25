@@ -1,0 +1,1180 @@
+﻿diff --git a/package-lock.json b/package-lock.json
+index 2051dec..fd3cab6 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -9,6 +9,7 @@
+       "version": "1.0.0",
+       "license": "MIT",
+       "dependencies": {
++        "@google/genai": "^1.46.0",
+         "@vitejs/plugin-react": "^5.1.3",
+         "@xenova/transformers": "^2.17.2",
+         "electron-squirrel-startup": "^1.0.1",
+@@ -1653,6 +1654,59 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/@google/genai": {
++      "version": "1.46.0",
++      "resolved": "https://registry.npmjs.org/@google/genai/-/genai-1.46.0.tgz",
++      "integrity": "sha512-ewPMN5JkKfgU5/kdco9ZhXBHDPhVqZpMQqIFQhwsHLf8kyZfx1cNpw1pHo1eV6PGEW7EhIBFi3aYZraFndAXqg==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "google-auth-library": "^10.3.0",
++        "p-retry": "^4.6.2",
++        "protobufjs": "^7.5.4",
++        "ws": "^8.18.0"
++      },
++      "engines": {
++        "node": ">=20.0.0"
++      },
++      "peerDependencies": {
++        "@modelcontextprotocol/sdk": "^1.25.2"
++      },
++      "peerDependenciesMeta": {
++        "@modelcontextprotocol/sdk": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@google/genai/node_modules/long": {
++      "version": "5.3.2",
++      "resolved": "https://registry.npmjs.org/long/-/long-5.3.2.tgz",
++      "integrity": "sha512-mNAgZ1GmyNhD7AuqnTG3/VQ26o760+ZYBPKjPvugO8+nLbYfX6TVpJPseBvopbdY+qpZ/lKUnmEc1LeZYS3QAA==",
++      "license": "Apache-2.0"
++    },
++    "node_modules/@google/genai/node_modules/protobufjs": {
++      "version": "7.5.4",
++      "resolved": "https://registry.npmjs.org/protobufjs/-/protobufjs-7.5.4.tgz",
++      "integrity": "sha512-CvexbZtbov6jW2eXAvLukXjXUW1TzFaivC46BpWc/3BpcCysb5Vffu+B3XHMm8lVEuy2Mm4XGex8hBSg1yapPg==",
++      "hasInstallScript": true,
++      "license": "BSD-3-Clause",
++      "dependencies": {
++        "@protobufjs/aspromise": "^1.1.2",
++        "@protobufjs/base64": "^1.1.2",
++        "@protobufjs/codegen": "^2.0.4",
++        "@protobufjs/eventemitter": "^1.1.0",
++        "@protobufjs/fetch": "^1.1.0",
++        "@protobufjs/float": "^1.0.2",
++        "@protobufjs/inquire": "^1.1.0",
++        "@protobufjs/path": "^1.1.2",
++        "@protobufjs/pool": "^1.1.0",
++        "@protobufjs/utf8": "^1.1.0",
++        "@types/node": ">=13.7.0",
++        "long": "^5.0.0"
++      },
++      "engines": {
++        "node": ">=12.0.0"
++      }
++    },
+     "node_modules/@huggingface/jinja": {
+       "version": "0.2.2",
+       "resolved": "https://registry.npmjs.org/@huggingface/jinja/-/jinja-0.2.2.tgz",
+@@ -2858,6 +2912,12 @@
+         "@types/node": "*"
+       }
+     },
++    "node_modules/@types/retry": {
++      "version": "0.12.0",
++      "resolved": "https://registry.npmjs.org/@types/retry/-/retry-0.12.0.tgz",
++      "integrity": "sha512-wWKOClTTiizcZhXnPY4wikVAwmdYHp8q6DmC+EJUzAMsycb7HB32Kh9RN4+0gExjmPmZSAQjgURXIGATPegAvA==",
++      "license": "MIT"
++    },
+     "node_modules/@types/wrap-ansi": {
+       "version": "3.0.0",
+       "resolved": "https://registry.npmjs.org/@types/wrap-ansi/-/wrap-ansi-3.0.0.tgz",
+@@ -3431,6 +3491,15 @@
+         "baseline-browser-mapping": "dist/cli.js"
+       }
+     },
++    "node_modules/bignumber.js": {
++      "version": "9.3.1",
++      "resolved": "https://registry.npmjs.org/bignumber.js/-/bignumber.js-9.3.1.tgz",
++      "integrity": "sha512-Ko0uX15oIUS7wJ3Rb30Fs6SkVbLmPBAKdlm7q9+ak9bbIeFf0MwuBsQV6z7+X768/cHsfg+WlysDWJcmthjsjQ==",
++      "license": "MIT",
++      "engines": {
++        "node": "*"
++      }
++    },
+     "node_modules/bl": {
+       "version": "4.1.0",
+       "resolved": "https://registry.npmjs.org/bl/-/bl-4.1.0.tgz",
+@@ -3556,6 +3625,12 @@
+         "node": "*"
+       }
+     },
++    "node_modules/buffer-equal-constant-time": {
++      "version": "1.0.1",
++      "resolved": "https://registry.npmjs.org/buffer-equal-constant-time/-/buffer-equal-constant-time-1.0.1.tgz",
++      "integrity": "sha512-zRpUiDwd/xk6ADqPMATG8vc9VPrkck7T07OIx0gnjmJAnHnTVXNQG3vfvWNuiZIkwu9KrKdA1iJKfsfTVxE6NA==",
++      "license": "BSD-3-Clause"
++    },
+     "node_modules/buffer-from": {
+       "version": "1.1.2",
+       "resolved": "https://registry.npmjs.org/buffer-from/-/buffer-from-1.1.2.tgz",
+@@ -4054,6 +4129,15 @@
+         "node": ">=12.10"
+       }
+     },
++    "node_modules/data-uri-to-buffer": {
++      "version": "4.0.1",
++      "resolved": "https://registry.npmjs.org/data-uri-to-buffer/-/data-uri-to-buffer-4.0.1.tgz",
++      "integrity": "sha512-0R9ikRb668HB7QDxT1vkpuUBtqc53YyAwMwGeUFKRojY/NWKvdZ+9UYtRfGmhqNbRkTSVpMbmyhXipFFv2cb/A==",
++      "license": "MIT",
++      "engines": {
++        "node": ">= 12"
++      }
++    },
+     "node_modules/debug": {
+       "version": "4.4.3",
+       "resolved": "https://registry.npmjs.org/debug/-/debug-4.4.3.tgz",
+@@ -4203,6 +4287,15 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/ecdsa-sig-formatter": {
++      "version": "1.0.11",
++      "resolved": "https://registry.npmjs.org/ecdsa-sig-formatter/-/ecdsa-sig-formatter-1.0.11.tgz",
++      "integrity": "sha512-nagl3RYrbNv6kQkeJIpt6NJZy8twLB/2vtz6yN9Z4vRKHN4/QZJIEbqohALSgwKdnksuY3k5Addp5lg8sVoVcQ==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "safe-buffer": "^5.0.1"
++      }
++    },
+     "node_modules/electron": {
+       "version": "40.2.1",
+       "resolved": "https://registry.npmjs.org/electron/-/electron-40.2.1.tgz",
+@@ -5189,6 +5282,12 @@
+       "dev": true,
+       "license": "Apache-2.0"
+     },
++    "node_modules/extend": {
++      "version": "3.0.2",
++      "resolved": "https://registry.npmjs.org/extend/-/extend-3.0.2.tgz",
++      "integrity": "sha512-fjquC59cD7CyW6urNXK0FBufkZcoiGG80wTuPujX590cB5Ttln20E2UB4S/WARVqhXffZl2LNgS+gQdPIIim/g==",
++      "license": "MIT"
++    },
+     "node_modules/external-editor": {
+       "version": "3.1.0",
+       "resolved": "https://registry.npmjs.org/external-editor/-/external-editor-3.1.0.tgz",
+@@ -5305,6 +5404,29 @@
+         "pend": "~1.2.0"
+       }
+     },
++    "node_modules/fetch-blob": {
++      "version": "3.2.0",
++      "resolved": "https://registry.npmjs.org/fetch-blob/-/fetch-blob-3.2.0.tgz",
++      "integrity": "sha512-7yAQpD2UMJzLi1Dqv7qFYnPbaPx7ZfFK6PiIxQ4PfkGPyNyl2Ugx+a/umUonmKqjhM4DnfbMvdX6otXq83soQQ==",
++      "funding": [
++        {
++          "type": "github",
++          "url": "https://github.com/sponsors/jimmywarting"
++        },
++        {
++          "type": "paypal",
++          "url": "https://paypal.me/jimmywarting"
++        }
++      ],
++      "license": "MIT",
++      "dependencies": {
++        "node-domexception": "^1.0.0",
++        "web-streams-polyfill": "^3.0.3"
++      },
++      "engines": {
++        "node": "^12.20 || >= 14.13"
++      }
++    },
+     "node_modules/ffmpeg-static": {
+       "version": "5.3.0",
+       "resolved": "https://registry.npmjs.org/ffmpeg-static/-/ffmpeg-static-5.3.0.tgz",
+@@ -5427,6 +5549,18 @@
+         "which": "bin/which"
+       }
+     },
++    "node_modules/formdata-polyfill": {
++      "version": "4.0.10",
++      "resolved": "https://registry.npmjs.org/formdata-polyfill/-/formdata-polyfill-4.0.10.tgz",
++      "integrity": "sha512-buewHzMvYL29jdeQTVILecSaZKnt/RJWjoZCF5OW60Z67/GmSLBkOFM7qh1PI3zFNtJbaZL5eQu1vLfazOwj4g==",
++      "license": "MIT",
++      "dependencies": {
++        "fetch-blob": "^3.1.2"
++      },
++      "engines": {
++        "node": ">=12.20.0"
++      }
++    },
+     "node_modules/fs-constants": {
+       "version": "1.0.0",
+       "resolved": "https://registry.npmjs.org/fs-constants/-/fs-constants-1.0.0.tgz",
+@@ -5516,6 +5650,74 @@
+       "license": "MIT",
+       "optional": true
+     },
++    "node_modules/gaxios": {
++      "version": "7.1.4",
++      "resolved": "https://registry.npmjs.org/gaxios/-/gaxios-7.1.4.tgz",
++      "integrity": "sha512-bTIgTsM2bWn3XklZISBTQX7ZSddGW+IO3bMdGaemHZ3tbqExMENHLx6kKZ/KlejgrMtj8q7wBItt51yegqalrA==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "extend": "^3.0.2",
++        "https-proxy-agent": "^7.0.1",
++        "node-fetch": "^3.3.2"
++      },
++      "engines": {
++        "node": ">=18"
++      }
++    },
++    "node_modules/gaxios/node_modules/agent-base": {
++      "version": "7.1.4",
++      "resolved": "https://registry.npmjs.org/agent-base/-/agent-base-7.1.4.tgz",
++      "integrity": "sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==",
++      "license": "MIT",
++      "engines": {
++        "node": ">= 14"
++      }
++    },
++    "node_modules/gaxios/node_modules/https-proxy-agent": {
++      "version": "7.0.6",
++      "resolved": "https://registry.npmjs.org/https-proxy-agent/-/https-proxy-agent-7.0.6.tgz",
++      "integrity": "sha512-vK9P5/iUfdl95AI+JVyUuIcVtd4ofvtrOr3HNtM2yxC9bnMbEdp3x01OhQNnjb8IJYi38VlTE3mBXwcfvywuSw==",
++      "license": "MIT",
++      "dependencies": {
++        "agent-base": "^7.1.2",
++        "debug": "4"
++      },
++      "engines": {
++        "node": ">= 14"
++      }
++    },
++    "node_modules/gaxios/node_modules/node-fetch": {
++      "version": "3.3.2",
++      "resolved": "https://registry.npmjs.org/node-fetch/-/node-fetch-3.3.2.tgz",
++      "integrity": "sha512-dRB78srN/l6gqWulah9SrxeYnxeddIG30+GOqK/9OlLVyLg3HPnr6SqOWTWOXKRwC2eGYCkZ59NNuSgvSrpgOA==",
++      "license": "MIT",
++      "dependencies": {
++        "data-uri-to-buffer": "^4.0.0",
++        "fetch-blob": "^3.1.4",
++        "formdata-polyfill": "^4.0.10"
++      },
++      "engines": {
++        "node": "^12.20.0 || ^14.13.1 || >=16.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/node-fetch"
++      }
++    },
++    "node_modules/gcp-metadata": {
++      "version": "8.1.2",
++      "resolved": "https://registry.npmjs.org/gcp-metadata/-/gcp-metadata-8.1.2.tgz",
++      "integrity": "sha512-zV/5HKTfCeKWnxG0Dmrw51hEWFGfcF2xiXqcA3+J90WDuP0SvoiSO5ORvcBsifmx/FoIjgQN3oNOGaQ5PhLFkg==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "gaxios": "^7.0.0",
++        "google-logging-utils": "^1.0.0",
++        "json-bigint": "^1.0.0"
++      },
++      "engines": {
++        "node": ">=18"
++      }
++    },
+     "node_modules/gensync": {
+       "version": "1.0.0-beta.2",
+       "resolved": "https://registry.npmjs.org/gensync/-/gensync-1.0.0-beta.2.tgz",
+@@ -5700,6 +5902,32 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
++    "node_modules/google-auth-library": {
++      "version": "10.6.2",
++      "resolved": "https://registry.npmjs.org/google-auth-library/-/google-auth-library-10.6.2.tgz",
++      "integrity": "sha512-e27Z6EThmVNNvtYASwQxose/G57rkRuaRbQyxM2bvYLLX/GqWZ5chWq2EBoUchJbCc57eC9ArzO5wMsEmWftCw==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "base64-js": "^1.3.0",
++        "ecdsa-sig-formatter": "^1.0.11",
++        "gaxios": "^7.1.4",
++        "gcp-metadata": "8.1.2",
++        "google-logging-utils": "1.1.3",
++        "jws": "^4.0.0"
++      },
++      "engines": {
++        "node": ">=18"
++      }
++    },
++    "node_modules/google-logging-utils": {
++      "version": "1.1.3",
++      "resolved": "https://registry.npmjs.org/google-logging-utils/-/google-logging-utils-1.1.3.tgz",
++      "integrity": "sha512-eAmLkjDjAFCVXg7A1unxHsLf961m6y17QFqXqAXGj/gVkKFrEICfStRfwUlGNfeCEjNRa32JEWOUTlYXPyyKvA==",
++      "license": "Apache-2.0",
++      "engines": {
++        "node": ">=14"
++      }
++    },
+     "node_modules/gopd": {
+       "version": "1.2.0",
+       "resolved": "https://registry.npmjs.org/gopd/-/gopd-1.2.0.tgz",
+@@ -6178,6 +6406,15 @@
+         "node": ">=6"
+       }
+     },
++    "node_modules/json-bigint": {
++      "version": "1.0.0",
++      "resolved": "https://registry.npmjs.org/json-bigint/-/json-bigint-1.0.0.tgz",
++      "integrity": "sha512-SiPv/8VpZuWbvLSMtTDU8hEfrZWg/mH/nV/b4o0CYbSxu1UIQPLdwKOCIyLQX+VIPO5vrLX3i8qtqFyhdPSUSQ==",
++      "license": "MIT",
++      "dependencies": {
++        "bignumber.js": "^9.0.0"
++      }
++    },
+     "node_modules/json-buffer": {
+       "version": "3.0.1",
+       "resolved": "https://registry.npmjs.org/json-buffer/-/json-buffer-3.0.1.tgz",
+@@ -6242,6 +6479,27 @@
+         "node": ">=8"
+       }
+     },
++    "node_modules/jwa": {
++      "version": "2.0.1",
++      "resolved": "https://registry.npmjs.org/jwa/-/jwa-2.0.1.tgz",
++      "integrity": "sha512-hRF04fqJIP8Abbkq5NKGN0Bbr3JxlQ+qhZufXVr0DvujKy93ZCbXZMHDL4EOtodSbCWxOqR8MS1tXA5hwqCXDg==",
++      "license": "MIT",
++      "dependencies": {
++        "buffer-equal-constant-time": "^1.0.1",
++        "ecdsa-sig-formatter": "1.0.11",
++        "safe-buffer": "^5.0.1"
++      }
++    },
++    "node_modules/jws": {
++      "version": "4.0.1",
++      "resolved": "https://registry.npmjs.org/jws/-/jws-4.0.1.tgz",
++      "integrity": "sha512-EKI/M/yqPncGUUh44xz0PxSidXFr/+r0pA70+gIYhjv+et7yxM+s29Y+VGDkovRofQem0fs7Uvf4+YmAdyRduA==",
++      "license": "MIT",
++      "dependencies": {
++        "jwa": "^2.0.1",
++        "safe-buffer": "^5.0.1"
++      }
++    },
+     "node_modules/keyv": {
+       "version": "4.5.4",
+       "resolved": "https://registry.npmjs.org/keyv/-/keyv-4.5.4.tgz",
+@@ -6766,6 +7024,26 @@
+         "semver": "^7.3.5"
+       }
+     },
++    "node_modules/node-domexception": {
++      "version": "1.0.0",
++      "resolved": "https://registry.npmjs.org/node-domexception/-/node-domexception-1.0.0.tgz",
++      "integrity": "sha512-/jKZoMpw0F8GRwl4/eLROPA3cfcXtLApP0QzLmUT/HuPCZWyB7IY9ZrMeKw2O/nFIqPQB3PVM9aYm0F312AXDQ==",
++      "deprecated": "Use your platform's native DOMException instead",
++      "funding": [
++        {
++          "type": "github",
++          "url": "https://github.com/sponsors/jimmywarting"
++        },
++        {
++          "type": "github",
++          "url": "https://paypal.me/jimmywarting"
++        }
++      ],
++      "license": "MIT",
++      "engines": {
++        "node": ">=10.5.0"
++      }
++    },
+     "node_modules/node-fetch": {
+       "version": "2.7.0",
+       "resolved": "https://registry.npmjs.org/node-fetch/-/node-fetch-2.7.0.tgz",
+@@ -7138,6 +7416,28 @@
+         "url": "https://github.com/sponsors/sindresorhus"
+       }
+     },
++    "node_modules/p-retry": {
++      "version": "4.6.2",
++      "resolved": "https://registry.npmjs.org/p-retry/-/p-retry-4.6.2.tgz",
++      "integrity": "sha512-312Id396EbJdvRONlngUx0NydfrIQ5lsYu0znKVUzVvArzEIt08V1qhtyESbGVd1FGX7UKtiFp5uwKZdM8wIuQ==",
++      "license": "MIT",
++      "dependencies": {
++        "@types/retry": "0.12.0",
++        "retry": "^0.13.1"
++      },
++      "engines": {
++        "node": ">=8"
++      }
++    },
++    "node_modules/p-retry/node_modules/retry": {
++      "version": "0.13.1",
++      "resolved": "https://registry.npmjs.org/retry/-/retry-0.13.1.tgz",
++      "integrity": "sha512-XQBQ3I8W1Cge0Seh+6gjj03LbmRFWuoszgK9ooCpwYIrhhoO80pfq4cUkU5DkknwfOfFteRwlZ56PYOGYyFWdg==",
++      "license": "MIT",
++      "engines": {
++        "node": ">= 4"
++      }
++    },
+     "node_modules/p-try": {
+       "version": "1.0.0",
+       "resolved": "https://registry.npmjs.org/p-try/-/p-try-1.0.0.tgz",
+@@ -8988,6 +9288,15 @@
+         "defaults": "^1.0.3"
+       }
+     },
++    "node_modules/web-streams-polyfill": {
++      "version": "3.3.3",
++      "resolved": "https://registry.npmjs.org/web-streams-polyfill/-/web-streams-polyfill-3.3.3.tgz",
++      "integrity": "sha512-d2JWLCivmZYTSIoge9MsgFCZrt571BikcWGYkjC1khllbTeDlGqZ2D8vD8E/lJa8WGWbb7Plm8/XJYV7IJHZZw==",
++      "license": "MIT",
++      "engines": {
++        "node": ">= 8"
++      }
++    },
+     "node_modules/webidl-conversions": {
+       "version": "3.0.1",
+       "resolved": "https://registry.npmjs.org/webidl-conversions/-/webidl-conversions-3.0.1.tgz",
+@@ -9128,6 +9437,27 @@
+       "integrity": "sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==",
+       "license": "ISC"
+     },
++    "node_modules/ws": {
++      "version": "8.20.0",
++      "resolved": "https://registry.npmjs.org/ws/-/ws-8.20.0.tgz",
++      "integrity": "sha512-sAt8BhgNbzCtgGbt2OxmpuryO63ZoDk/sqaB/znQm94T4fCEsy/yV+7CdC1kJhOU9lboAEU7R3kquuycDoibVA==",
++      "license": "MIT",
++      "engines": {
++        "node": ">=10.0.0"
++      },
++      "peerDependencies": {
++        "bufferutil": "^4.0.1",
++        "utf-8-validate": ">=5.0.2"
++      },
++      "peerDependenciesMeta": {
++        "bufferutil": {
++          "optional": true
++        },
++        "utf-8-validate": {
++          "optional": true
++        }
++      }
++    },
+     "node_modules/xmlbuilder": {
+       "version": "15.1.1",
+       "resolved": "https://registry.npmjs.org/xmlbuilder/-/xmlbuilder-15.1.1.tgz",
+diff --git a/package.json b/package.json
+index e6a1951..41091b7 100644
+--- a/package.json
++++ b/package.json
+@@ -32,6 +32,7 @@
+     "vite": "^5.4.21"
+   },
+   "dependencies": {
++    "@google/genai": "^1.46.0",
+     "@vitejs/plugin-react": "^5.1.3",
+     "@xenova/transformers": "^2.17.2",
+     "electron-squirrel-startup": "^1.0.1",
+diff --git a/src/components/CodeExtractionPanel.jsx b/src/components/CodeExtractionPanel.jsx
+index 141aaf2..e0311ae 100644
+--- a/src/components/CodeExtractionPanel.jsx
++++ b/src/components/CodeExtractionPanel.jsx
+@@ -1,15 +1,16 @@
+ import React, { useEffect, useRef, useState } from "react";
+ import Tesseract from "tesseract.js";
++import { runGeminiExtraction } from "../services/geminiService";
+ 
+-export default function CodeExtractionPanel({ videoPlayerRef, roi, isSelectingRoi, onRequestRoiSelect, onCancelRoiSelect }) {
++export default function CodeExtractionPanel({ videoPlayerRef, roi, isSelectingRoi, onRequestRoiSelect, onCancelRoiSelect, onScanStateChange, extractionMode }) {
+   const [isScanning, setIsScanning] = useState(false);
+   const [status, setStatus] = useState("Select ROI to begin");
+   const [finalOutput, setFinalOutput] = useState("");
+   const [copied, setCopied] = useState(false);
+ 
+   // Internal scanning controls (minimum capture timings)
+-  const minCheckMs = 250;     // how often we CHECK changes (cheap)
+-  const minOcrCooldownMs = 1200; // minimum time between OCR runs (expensive)
++  const minOcrCooldownMs = extractionMode === "online" ? 1000 : 1200;
++  const minCheckMs = extractionMode === "online" ? 1000 : 250;     // how often we CHECK changes (cheap)
+ 
+   // Refs for loop state
+   const stopRef = useRef(true);
+@@ -18,6 +19,9 @@ export default function CodeExtractionPanel({ videoPlayerRef, roi, isSelectingRo
+   const lastSigRef = useRef(null);            // last frame signature
+   const lastOcrAtRef = useRef(0);             // last OCR timestamp (real time ms)
+   const lastAcceptedTextRef = useRef("");     // last accepted OCR snapshot text
++  
++  const geminiBlocksRef = useRef([]);
++  const lastBase64LengthRef = useRef(0);
+   const lineMapRef = useRef(new Map());       // Map<lineNumber, { text, qualityScore, sourceFrame }>
+   const frameCounterRef = useRef(0);
+   const sessionModeRef = useRef(null);        // null | "numbered" | "unnumbered"
+@@ -89,20 +93,58 @@ export default function CodeExtractionPanel({ videoPlayerRef, roi, isSelectingRo
+     // ~0-2: almost same
+     // ~3-8: small change
+     // >8: significant change
+-    return diff >= 6;
++    return diff >= (extractionMode === "online" ? 5 : 6);
+   }
+ 
+   // ---------- OCR step ----------
++  const runOnlineOnce = async (tNow) => {
++    if (!videoPlayerRef?.current || !roi) return;
++    setStatus(`Sending to Gemini @ ${formatTime(tNow)}...`);
++    try {
++      const codeOrSkip = await runGeminiExtraction(videoPlayerRef, roi, lastBase64LengthRef);
++      if (codeOrSkip?.skipped) {
++        setStatus(`Skipping identical frame @ ${formatTime(tNow)}`);
++        return;
++      }
++      const code = codeOrSkip;
++      if (!stopRef.current) {
++        geminiBlocksRef.current.push(code);
++        
++        const incomingLines = code.split("\n");
++        const merged = mergeUnnumberedLines(unnumberedLinesRef.current, incomingLines);
++        unnumberedLinesRef.current = merged;
++        const out = merged.join("\n");
++        setFinalOutput(out);
++        setStatus(`Code extracted @ ${formatTime(tNow)}`);
++      }
++    } catch (err) {
++      console.error(err);
++      if (!stopRef.current) {
++        let msg = err.message || "";
++        if (msg === "No code detected in selected ROI") {
++          setStatus(msg);
++        } else {
++          if (msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED")) {
++            msg = "Quota Exceeded (Daily limits hit - wait or check API Key restrictions)";
++          } else if (msg.length > 50) {
++            msg = msg.substring(0, 50) + "...";
++          }
++          setStatus(`API Error: ${msg}`);
++        }
++      }
++    }
++  };
++
+   const runOcrOnce = async (videoTimeSec) => {
+     if (!videoPlayerRef?.current || !roi) return;
+ 
+     const canvas = videoPlayerRef.current.getVideoFrame(roi);
+     if (!canvas) return;
+ 
+-    // OCR
+     setStatus(`OCR running @ ${formatTime(getVideoTime())}...`);
+     const { data } = await Tesseract.recognize(canvas, "eng");
+     const raw = data?.text || "";
++
+     const normalizedFrameText = normalizeFrameText(raw);
+     if (!normalizedFrameText) return;
+ 
+@@ -181,7 +223,9 @@ export default function CodeExtractionPanel({ videoPlayerRef, roi, isSelectingRo
+     unnumberedLinesRef.current = [];
+     lastUnnumberedBlockSigRef.current = "";
+     lastSigRef.current = null;
+-    lastOcrAtRef.current = 0;
++    // DO NOT reset lastOcrAtRef.current = 0; to enforce global rate limits across session boundary clicks
++    geminiBlocksRef.current = [];
++    lastBase64LengthRef.current = 0;
+   };
+ 
+   const startExtraction = () => {
+@@ -197,6 +241,7 @@ export default function CodeExtractionPanel({ videoPlayerRef, roi, isSelectingRo
+ 
+     resetSession();
+     setIsScanning(true);
++    onScanStateChange?.(true);
+     setStatus(`Scanning... @ ${formatTime(getVideoTime())}`);
+ 
+     const tick = async () => {
+@@ -215,10 +260,14 @@ export default function CodeExtractionPanel({ videoPlayerRef, roi, isSelectingRo
+         if (changed && cooldownOk) {
+           lastOcrAtRef.current = nowMs;
+           try {
+-            await runOcrOnce(tNow);
++            if (extractionMode === "online") {
++              await runOnlineOnce(tNow);
++            } else {
++              await runOcrOnce(tNow);
++            }
+           } catch (e) {
+             console.error(e);
+-            setStatus("OCR error (check console)");
++            setStatus(extractionMode === "online" ? "Gemini error (check console)" : "OCR error (check console)");
+           }
+         } else if (!changed) {
+           setStatus(`No change @ ${formatTime(tNow)} (skipping)`);
+@@ -233,13 +282,46 @@ export default function CodeExtractionPanel({ videoPlayerRef, roi, isSelectingRo
+     tick();
+   };
+ 
+-  const stopExtraction = () => {
++  const stopExtraction = async () => {
+     if (!isScanning) return;
+     stopRef.current = true;
+     setIsScanning(false);
++    onScanStateChange?.(false);
+     setStatus("Scan stopped - finalizing");
+     if (checkTimerRef.current) clearTimeout(checkTimerRef.current);
+     checkTimerRef.current = null;
++    
++    // Stop the ROI selection immediately so the user can interact while merging completes
++    onCancelRoiSelect?.();
++
++    if (extractionMode === "online") {
++      const blocks = geminiBlocksRef.current;
++      if (blocks.length === 0) {
++        setFinalOutput("No code detected in selected ROI");
++        setStatus("No code detected in selected ROI");
++      } else if (blocks.length === 1) {
++        setFinalOutput(blocks[0]);
++        setStatus("Code extracted");
++      } else {
++        setStatus(`Merging ${blocks.length} frames with Gemini AI...`);
++        try {
++          const merged = await window.api.mergeCodeOnline(blocks);
++          setFinalOutput(merged || "No code detected");
++          setStatus("Frames successfully merged!");
++        } catch (err) {
++          console.error("Merge error:", err);
++          setFinalOutput(blocks.join("\n\n"));
++          let msg = err.message || "";
++          if (msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED")) {
++            msg = "Quota Exceeded (Daily limit hit - wait or check API Key restrictions)";
++          } else if (msg.length > 50) {
++            msg = msg.substring(0, 50) + "...";
++          }
++          setStatus(`Merge failed: ${msg}`);
++        }
++      }
++      return;
++    }
+ 
+     const numberedOut = finalizeOrderedCode(lineMapRef.current);
+     const unnumberedOut = unnumberedLinesRef.current.join("\n").trim();
+@@ -251,7 +333,6 @@ export default function CodeExtractionPanel({ videoPlayerRef, roi, isSelectingRo
+ 
+     setFinalOutput(out || "No code extracted");
+     setStatus(out ? "Scan stopped" : "No code extracted");
+-    onCancelRoiSelect?.();
+   };
+ 
+   const toggleScan = () => {
+@@ -292,7 +373,7 @@ export default function CodeExtractionPanel({ videoPlayerRef, roi, isSelectingRo
+   }, []);
+ 
+   return (
+-    <div className="code-card">
++    <div className="code-card" style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+       <div className="card-title">Γ£¿ OCR & Code Extraction</div>
+ 
+       <div className="card-desc">
+@@ -341,7 +422,17 @@ export default function CodeExtractionPanel({ videoPlayerRef, roi, isSelectingRo
+         Status: {status}
+       </div>
+ 
+-      <div className="output-area" style={{ whiteSpace: "pre-wrap" }}>
++      <div className="output-area" style={{ 
++        whiteSpace: "pre-wrap", 
++        fontSize: "15px", 
++        flex: "1 1 0px", 
++        minHeight: 0,
++        fontFamily: "'Fira Code', 'Courier New', monospace",
++        border: "1px solid #4ade80",
++        padding: "10px",
++        borderRadius: "6px",
++        overflowY: "auto"
++      }}>
+         {finalOutput || "Final code will appear here after the scan ends..."}
+       </div>
+     </div>
+diff --git a/src/components/Header.jsx b/src/components/Header.jsx
+index 694fa9f..a4b65ce 100644
+--- a/src/components/Header.jsx
++++ b/src/components/Header.jsx
+@@ -1,7 +1,7 @@
+ import React, { useState,useRef,useEffect } from "react";
+ import "./Header.css";
+ 
+-export default function Header({ openFile }) {
++export default function Header({ openFile, extractionMode, setExtractionMode }) {
+   const [activeWindow, setActiveWindow] = useState(null);
+   const [windowPos, setWindowPos] = useState({ top: 0, left: 0 });
+   const menuRef = useRef(null);
+@@ -68,6 +68,18 @@ export default function Header({ openFile }) {
+     </div>
+ </nav>
+ 
++        <div style={{ marginLeft: "auto", marginRight: "20px", display: "flex", gap: "10px", alignItems: "center", color: "white", fontSize: "14px" }}>
++          <span style={{ fontWeight: 500, opacity: 0.9 }}>Code Mode:</span>
++          <select 
++            value={extractionMode} 
++            onChange={e => setExtractionMode && setExtractionMode(e.target.value)}
++            style={{ padding: "4px 8px", background: "#374151", color: "white", border: "1px solid #4b5563", borderRadius: "4px", outline: "none", cursor: "pointer" }}
++          >
++            <option value="offline">Offline</option>
++            <option value="online">Online</option>
++          </select>
++        </div>
++
+       </header>
+ 
+       {activeWindow && (
+diff --git a/src/components/RoiSelector.jsx b/src/components/RoiSelector.jsx
+index f32372a..16efa12 100644
+--- a/src/components/RoiSelector.jsx
++++ b/src/components/RoiSelector.jsx
+@@ -1,7 +1,7 @@
+ import { useRef, useState, useEffect } from "react";
+ import "./RoiSelector.css";
+ 
+-export default function RoiSelector({ enabled = true, currentRoi, onChange }) {
++export default function RoiSelector({ enabled = true, isScanning = false, currentRoi, onChange }) {
+   const overlayRef = useRef(null);
+   const [dragging, setDragging] = useState(false);
+   const [start, setStart] = useState(null);
+@@ -70,7 +70,7 @@ export default function RoiSelector({ enabled = true, currentRoi, onChange }) {
+           }}
+         />
+       )}
+-      <div className="roi-hint">Drag to select ROI (code area)</div>
++      <div className="roi-hint" style={{ display: isScanning ? "none" : undefined }}>Drag to select ROI (code area)</div>
+     </div>
+   );
+ }
+diff --git a/src/components/Sidebar.jsx b/src/components/Sidebar.jsx
+index ba6b9d2..d36eda1 100644
+--- a/src/components/Sidebar.jsx
++++ b/src/components/Sidebar.jsx
+@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle } f
+ import CodeExtractionPanel from "./CodeExtractionPanel";
+ import "./Sidebar.css";
+ 
+-const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRoi, onRequestRoiSelect, onCancelRoiSelect }, ref) {
++const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRoi, onRequestRoiSelect, onCancelRoiSelect, onScanStateChange, extractionMode }, ref) {
+   const [activeTab, setActiveTab] = useState("Code");
+ 
+   // --- Speech / Audio Extraction ---
+@@ -275,6 +275,8 @@ const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRo
+             isSelectingRoi={isSelectingRoi} 
+             onRequestRoiSelect={onRequestRoiSelect} 
+             onCancelRoiSelect={onCancelRoiSelect}
++            onScanStateChange={onScanStateChange}
++            extractionMode={extractionMode}
+           />
+         )}
+ 
+diff --git a/src/components/VideoPlayer.jsx b/src/components/VideoPlayer.jsx
+index d3617e1..96aa0f3 100644
+--- a/src/components/VideoPlayer.jsx
++++ b/src/components/VideoPlayer.jsx
+@@ -8,7 +8,7 @@ import React, {
+ import "./VideoPlayer.css";
+ import RoiSelector from "./RoiSelector";
+ 
+-const VideoPlayer = forwardRef(function VideoPlayer({ roi, onRoiChange, onPlay, isSelectingRoi }, ref) {
++const VideoPlayer = forwardRef(function VideoPlayer({ roi, onRoiChange, onPlay, isSelectingRoi, isScanning }, ref) {
+   const videoRef = useRef(null);
+   const fileInputRef = useRef(null);
+ 
+@@ -225,10 +225,11 @@ const VideoPlayer = forwardRef(function VideoPlayer({ roi, onRoiChange, onPlay,
+           src={videoSrc || undefined}
+         />
+ 
+-        {/* ROI overlay only when a video is loaded */}
++        {/* ROI overlay properly mounts permanently but uses internal logic to hide via CSS during scans */}
+         {videoSrc && (
+           <RoiSelector
+             enabled={Boolean(isSelectingRoi)}
++            isScanning={isScanning}
+             currentRoi={roi}
+             onChange={(overlayRoi) => {
+               const mapped = toVideoNormalizedRoi(overlayRoi);
+diff --git a/src/main.js b/src/main.js
+index 9f9ffbd..fbd7c05 100644
+--- a/src/main.js
++++ b/src/main.js
+@@ -1,4 +1,5 @@
+ import { app, BrowserWindow, ipcMain } from 'electron';
++import { GoogleGenAI } from "@google/genai";
+ import path from 'node:path';
+ import started from 'electron-squirrel-startup';
+ import ffmpeg from 'fluent-ffmpeg';
+@@ -377,6 +378,128 @@ ipcMain.handle('chat-copilot', async (event, messages) => {
+   return response.replace(/<\|im_end\|>/g, '').trim();
+ });
+ 
++ipcMain.handle('extract-code-online', async (event, base64Data) => {
++  let apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || process.env.VITE_GOOGLE_API_KEY || "";
++  
++  try {
++    const envPath = path.join(app.getAppPath(), '.env');
++    if (fs.existsSync(envPath)) {
++      const text = fs.readFileSync(envPath, 'utf8');
++      const match = text.match(/^(?:VITE_)?(?:GOOGLE|GEMINI)_API_KEY\s*=\s*(.*)$/m);
++      if (match && match[1]) {
++         apiKey = match[1].trim().replace(/^['"]|['"]$/g, '');
++      }
++    }
++  } catch (e) {}
++
++  if (!apiKey) {
++    throw new Error("Missing Google API Key.\\nPlease create a .env file in the project folder containing:\\nVITE_GOOGLE_API_KEY=your_key_here");
++  }
++
++  try {
++    console.log(`[Gemini Main] Sending request to Gemini API via SDK (Base64 payload length: ${base64Data.length})`);
++    const ai = new GoogleGenAI({ apiKey: apiKey });
++    const response = await ai.models.generateContent({
++      model: "gemini-3-flash-preview",
++      contents: {
++        parts: [
++          {
++            inlineData: {
++              mimeType: "image/jpeg",
++              data: base64Data
++            }
++          },
++          {
++            text: `You are an expert software engineer and OCR correction system.\n\nYour task is to extract ONLY the programming code visible in this image.\n\nSTRICT INSTRUCTIONS:\n1. Extract ONLY code. Do NOT include explanations, comments, or descriptions.\n2. Ignore all non-code UI elements such as file explorer, line numbers, icons, menus, terminal panels, and background text.\n3. Fix OCR errors intelligently:\n   - correct obvious variable names\n   - fix broken symbols such as { } ( ) ; : , .\n   - restore likely syntax\n4. Maintain correct formatting:\n   - proper indentation\n   - correct line breaks\n   - preserve logical structure\n5. If part of the code is unclear, infer only the most likely visible code.\n6. DO NOT add new logic that is not visible.\n7. DO NOT include markdown formatting.\n8. Return ONLY the cleaned code.`
++          }
++        ]
++      },
++      config: { temperature: 0.1 }
++    });
++    
++    const extractedText = response.text || "";
++    console.log("[online] SDK extracted text:", extractedText);
++    return extractedText;
++  } catch (err) {
++    console.error("[Gemini Main] Extraction request failed:", err.message);
++    throw err;
++  }
++});
++
++ipcMain.handle('merge-code-online', async (event, framesList) => {
++  if (!framesList || framesList.length === 0) return "";
++  
++  let apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || process.env.VITE_GOOGLE_API_KEY || "";
++  try {
++    const envPath = path.join(app.getAppPath(), '.env');
++    if (fs.existsSync(envPath)) {
++      const text = fs.readFileSync(envPath, 'utf8');
++      const match = text.match(/^(?:VITE_)?(?:GOOGLE|GEMINI)_API_KEY\s*=\s*(.*)$/m);
++      if (match && match[1]) {
++         apiKey = match[1].trim().replace(/^['"]|['"]$/g, '');
++      }
++    }
++  } catch (e) {}
++
++  if (!apiKey) throw new Error("Missing Google API Key.");
++
++  let prompt = `You are a senior software engineer resolving a code merge.
++
++I extracted code from a scrolling video frame-by-frame.
++Because the video scrolls, there is heavy duplication and overlap between frames.
++
++Your task is to MERGE all frames into ONE clean, correct, complete code file.
++
++CRITICAL RULES:
++1. DO NOT concatenate blocks.
++2. Detect overlapping lines between consecutive frames.
++3. Merge overlapping sections seamlessly.
++4. REMOVE all duplication completely.
++5. If the same function, class, block, or logic appears multiple times, KEEP ONLY ONE.
++6. Maintain the original top-to-bottom order of the code.
++7. Fix small inconsistencies between frames, such as broken indentation or split lines.
++8. Do NOT remove unique code.
++9. Do NOT introduce new logic.
++10. Return ONLY the final deduplicated code.
++11. Do NOT include markdown.
++12. Do NOT include explanations.
++
++Here are the extracted frames in chronological order:\\n`;
++  
++  framesList.forEach((frameCode, i) => {
++    prompt += `--- FRAME \${i+1} ---\\n\${frameCode}\\n\\n`;
++  });
++  
++  try {
++    console.log(`[Gemini Main] Sending multi-frame merge request via SDK (\${framesList.length} frames)`);
++    const ai = new GoogleGenAI({ apiKey: apiKey });
++    const response = await ai.models.generateContent({
++      model: "gemini-3-flash-preview",
++      contents: prompt,
++      config: { temperature: 0.1 }
++    });
++    
++    let mergedText = response.text || "";
++    
++    // Strip markdown fences just in case API disobeys rule 11
++    if (mergedText.trim().startsWith("\`\`\`")) {
++      const lines = mergedText.trim().split("\\n");
++      if (lines.length > 1) {
++        lines.shift();
++        if (lines[lines.length - 1].trim().startsWith("\`\`\`")) {
++          lines.pop();
++        }
++        mergedText = lines.join("\\n");
++      }
++    }
++    
++    console.log(`[Gemini Main] Multi-frame merge successful. Extracted text length: \${mergedText.length}`);
++    return mergedText;
++  } catch (err) {
++    console.error("[Gemini Main] Merge request failed:", err.message);
++    throw err;
++  }
++});
+ 
+ ipcMain.handle('extract-audio', async (event, videoPath) => {
+   if (!videoPath) throw new Error("No video path provided");
+diff --git a/src/preload.js b/src/preload.js
+index d9ff53c..48f2780 100644
+--- a/src/preload.js
++++ b/src/preload.js
+@@ -3,6 +3,8 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
+ contextBridge.exposeInMainWorld('api', {
+   extractAudio: (path) => ipcRenderer.invoke('extract-audio', path),
+   chatCopilot: (messages) => ipcRenderer.invoke('chat-copilot', messages),
++  extractCodeOnline: (base64Image) => ipcRenderer.invoke('extract-code-online', base64Image),
++  mergeCodeOnline: (framesList) => ipcRenderer.invoke('merge-code-online', framesList),
+   // Long-video offline transcription (job-based)
+   createOfflineTranscriptionJob: (params) => ipcRenderer.invoke('offline-transcription/createJob', params),
+   startOfflineTranscription: (jobId) => ipcRenderer.invoke('offline-transcription/start', jobId),
+diff --git a/src/renderer.jsx b/src/renderer.jsx
+index ef1378b..e83a7c2 100644
+--- a/src/renderer.jsx
++++ b/src/renderer.jsx
+@@ -11,6 +11,8 @@ const APP = () => {
+   const sidebarRef = useRef(null);
+   const [roi, setRoi] = useState(null);
+   const [isSelectingRoi, setIsSelectingRoi] = useState(false);
++  const [isScanning, setIsScanning] = useState(false);
++  const [extractionMode, setExtractionMode] = useState("offline");
+ 
+   const openFile = () => {
+     videoPlayerRef.current?.openFileDialog?.();
+@@ -22,7 +24,7 @@ const APP = () => {
+ 
+   return (
+     <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
+-      <Header openFile={openFile} />
++      <Header openFile={openFile} extractionMode={extractionMode} setExtractionMode={setExtractionMode} />
+ 
+       <div style={{ flex: 1, display: "flex", gap: "24px", padding: "24px" }}>
+         <VideoPlayer 
+@@ -31,6 +33,7 @@ const APP = () => {
+           onRoiChange={(newRoi) => { setRoi(newRoi); setIsSelectingRoi(false); }} 
+           onPlay={onVideoPlay} 
+           isSelectingRoi={isSelectingRoi} 
++          isScanning={isScanning}
+         />
+         <Sidebar 
+           ref={sidebarRef} 
+@@ -39,6 +42,8 @@ const APP = () => {
+           isSelectingRoi={isSelectingRoi}
+           onRequestRoiSelect={() => setIsSelectingRoi(true)}
+           onCancelRoiSelect={() => { setIsSelectingRoi(false); setRoi(null); }}
++          onScanStateChange={(scanning) => setIsScanning(scanning)}
++          extractionMode={extractionMode}
+         />
+       </div>
+     </div>
+diff --git a/src/services/geminiService.js b/src/services/geminiService.js
+new file mode 100644
+index 0000000..6788a4f
+--- /dev/null
++++ b/src/services/geminiService.js
+@@ -0,0 +1,49 @@
++export async function runGeminiExtraction(videoPlayerRef, roi, lastBase64LengthRef) {
++  const canvas = videoPlayerRef.current.getVideoFrame(roi);
++  if (!canvas) {
++    console.error("[Gemini] Failed to capture video frame.");
++    throw new Error("Failed to capture video frame from player.");
++  }
++  
++  const base64Full = canvas.toDataURL("image/jpeg");
++  if (!base64Full || base64Full === "data:,") {
++    throw new Error("ROI image capture failed (blank image produced).");
++  }
++
++  const b64Data = base64Full.split(',')[1];
++  
++  if (lastBase64LengthRef && lastBase64LengthRef.current === b64Data.length) {
++    console.log(`[Gemini] Skipping identical frame. Base64 length: ${b64Data.length}`);
++    return { skipped: true };
++  }
++  if (lastBase64LengthRef) lastBase64LengthRef.current = b64Data.length;
++  
++  const approximateBlobSize = Math.round((b64Data.length * 3) / 4);
++  
++  console.log("[online] mode:", "online");
++  console.log("[online] roi:", roi);
++  console.log("[online] captured image size:", approximateBlobSize);
++  console.log("[online] base64 length:", b64Data.length);
++  console.log("[online] sending Gemini request...");
++  
++  const rawData = await window.api.extractCodeOnline(b64Data);
++  
++  if (!rawData || !rawData.trim()) {
++    throw new Error("No code detected in selected ROI");
++  }
++  
++  let cleaned = rawData.trim();
++
++  if (cleaned.startsWith("\`\`\`")) {
++    const lines = cleaned.split("\\n");
++    if (lines.length > 1) {
++      lines.shift();
++      if (lines[lines.length - 1].trim().startsWith("\`\`\`")) {
++        lines.pop();
++      }
++      cleaned = lines.join("\\n");
++    }
++  }
++  
++  return cleaned;
++}
+diff --git a/test-genai.mjs b/test-genai.mjs
+new file mode 100644
+index 0000000..806204e
+--- /dev/null
++++ b/test-genai.mjs
+@@ -0,0 +1,40 @@
++import fs from "fs";
++import path from "path";
++import { GoogleGenAI } from "@google/genai";
++
++// 1. Read key
++const envPath = path.resolve('.env');
++let apiKey = "";
++if (fs.existsSync(envPath)) {
++  const text = fs.readFileSync(envPath, 'utf8');
++  const match = text.match(/^(?:VITE_)?(?:GOOGLE|GEMINI)_API_KEY\s*=\s*(.*)$/m);
++  if (match && match[1]) {
++    apiKey = match[1].trim().replace(/^['"]|['"]$/g, '');
++  }
++}
++
++if (!apiKey) {
++  console.error("No API key found in .env");
++  process.exit(1);
++}
++
++console.log("Found key starting with:", apiKey.substring(0, 8), "length:", apiKey.length);
++
++const ai = new GoogleGenAI({ apiKey });
++
++async function test() {
++  try {
++    console.log("Sending ping to SDK...");
++    const response = await ai.models.generateContent({
++      model: "gemini-1.5-flash",
++      contents: "Hello, what models are available to me?"
++    });
++    console.log("Success! Response:");
++    console.log(response.text);
++  } catch (err) {
++    console.error("SDK Error details:");
++    console.error(err);
++  }
++}
++
++test();
+diff --git a/test-models.js b/test-models.js
+new file mode 100644
+index 0000000..d14a6be
+--- /dev/null
++++ b/test-models.js
+@@ -0,0 +1,19 @@
++import fs from "fs";
++import path from "path";
++
++// read .env
++const envPath = path.resolve('.env');
++const text = fs.readFileSync(envPath, 'utf8');
++const match = text.match(/^(?:VITE_)?(?:GOOGLE|GEMINI)_API_KEY\s*=\s*(.*)$/m);
++const apiKey = match[1].trim().replace(/^['"]|['"]$/g, '');
++
++const fetchUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=\${apiKey}`;
++
++fetch(fetchUrl)
++  .then(res => res.json())
++  .then(data => {
++    const models = data.models.filter(m => m.supportedGenerationMethods.includes("generateContent"));
++    console.log("Supported Models for generateContent:");
++    models.forEach(m => console.log(m.name));
++  })
++  .catch(err => console.error(err));
+diff --git a/test-models.mjs b/test-models.mjs
+new file mode 100644
+index 0000000..c8ba423
+--- /dev/null
++++ b/test-models.mjs
+@@ -0,0 +1,19 @@
++import { GoogleGenAI } from "@google/genai";
++import fs from "fs";
++
++const ai = new GoogleGenAI({ apiKey: "AIzaSyAjGWXzRhln5cSHLA_U92x1zDb45YiLy2E" });
++
++async function run() {
++  try {
++    const list = await ai.models.list(); // or listModels() depending on the SDK version
++    let out = "";
++    for await (const model of list) {
++        out += model.name + "\n";
++    }
++    fs.writeFileSync("models.txt", out);
++  } catch (err) {
++    console.error("Error listing models:", err);
++  }
++}
++
++run();
+diff --git a/test2.mjs b/test2.mjs
+new file mode 100644
+index 0000000..f3a55e9
+--- /dev/null
++++ b/test2.mjs
+@@ -0,0 +1,27 @@
++import fs from "fs";
++import path from "path";
++
++const envPath = path.resolve('.env');
++let apiKey = "";
++const text = fs.readFileSync(envPath, 'utf8');
++const match = text.match(/^(?:VITE_)?(?:GOOGLE|GEMINI)_API_KEY\s*=\s*(.*)$/m);
++if (match && match[1]) {
++  apiKey = match[1].trim().replace(/^['"]|['"]$/g, '');
++}
++
++console.log("Using fetch natively. Key starts with:", apiKey.substring(0, 8));
++
++const fetchUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=\${apiKey}`;
++
++try {
++  const res = await fetch(fetchUrl, {
++    method: "POST",
++    headers: { "Content-Type": "application/json" },
++    body: JSON.stringify({
++      contents: [{ parts: [{ text: "Hello, test this." }] }]
++    })
++  });
++  console.log(res.status, res.statusText);
++  const body = await res.text();
++  console.log(body);
++} catch(e) { console.error(e) }
+diff --git a/vite.main.config.mjs b/vite.main.config.mjs
+index aba457d..f613304 100644
+--- a/vite.main.config.mjs
++++ b/vite.main.config.mjs
+@@ -9,7 +9,10 @@ export default defineConfig({
+         'onnxruntime-node',
+         'fluent-ffmpeg',
+         'ffmpeg-static',
+-        'wavefile'
++        'wavefile',
++        'bufferutil',
++        'utf-8-validate',
++        '@google/genai'
+       ]
+     }
+   }
