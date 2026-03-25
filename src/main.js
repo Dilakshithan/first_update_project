@@ -17,7 +17,7 @@ function shouldApplyDotEnvValue(key, newVal) {
   if (newVal === undefined || newVal === null) return false;
   // Always override OPENAI_API_KEY during refresh so we pick up changes without a restart!
   if (key === 'OPENAI_API_KEY') return true;
-  
+
   const cur = process.env[key];
   if (cur === undefined || !String(cur).trim()) return true;
   return false;
@@ -91,7 +91,7 @@ function refreshEnvFromDotFiles() {
 
   try {
     tryLoad(path.join(app.getPath('userData'), '.env'));
-  } catch (_) {}
+  } catch (_) { }
 }
 
 const PROJECT_PACKAGE_NAME = 'empty_one';
@@ -100,10 +100,10 @@ function findProjectRootForDotEnv() {
   const startDirs = [];
   try {
     startDirs.push(process.cwd());
-  } catch (_e) {}
+  } catch (_e) { }
   try {
     startDirs.push(app.getAppPath());
-  } catch (_e) {}
+  } catch (_e) { }
   startDirs.push(path.join(__dirname, '..', '..'));
   startDirs.push(path.join(__dirname, '..'));
 
@@ -119,7 +119,7 @@ function findProjectRootForDotEnv() {
         try {
           const j = JSON.parse(fs.readFileSync(pkg, 'utf8'));
           if (j && j.name === PROJECT_PACKAGE_NAME) return dir;
-        } catch (_e) {}
+        } catch (_e) { }
       }
       const parent = path.dirname(dir);
       if (parent === dir) break;
@@ -420,7 +420,7 @@ function runChatInWorker(modelsPath, prompt) {
   return new Promise((resolve, reject) => {
     const worker = getChatWorker();
     const id = Date.now() + Math.random().toString();
-    
+
     const onMessage = (res) => {
       if (res.id === id) {
         worker.off('message', onMessage);
@@ -508,7 +508,7 @@ function getWhisperWorker() {
     WHISPER_WORKERS.push(worker);
     return worker;
   }
-  
+
   const worker = WHISPER_WORKERS[workerIndex];
   workerIndex = (workerIndex + 1) % WHISPER_WORKERS.length;
   return worker;
@@ -518,7 +518,7 @@ function runTranscriptionInWorker(modelsPath, float32Data, chunkLengthSec) {
   return new Promise((resolve, reject) => {
     const worker = getWhisperWorker();
     const id = Date.now() + Math.random().toString();
-    
+
     const onMessage = (res) => {
       if (res.id === id) {
         worker.off('message', onMessage);
@@ -653,37 +653,35 @@ ipcMain.handle('chat-copilot', async (event, messages) => {
   const modelsPath = isDev ? path.join(app.getAppPath(), 'models') : path.join(process.resourcesPath, 'models');
 
   let prompt = "";
-  for(const msg of messages) {
-     prompt += `<|im_start|>${msg.role}\n${msg.content}<|im_end|>\n`;
+  for (const msg of messages) {
+    prompt += `<|im_start|>${msg.role}\n${msg.content}<|im_end|>\n`;
   }
   prompt += `<|im_start|>assistant\n`;
 
   console.log("Generating AI response in worker...");
   const output = await runChatInWorker(modelsPath, prompt);
-  
+
   let response = output[0].generated_text;
-  if(response.startsWith(prompt)) {
-     response = response.slice(prompt.length);
+  if (response.startsWith(prompt)) {
+    response = response.slice(prompt.length);
   }
   return response.replace(/<\|im_end\|>/g, '').trim();
 });
 
 ipcMain.handle('extract-code-online', async (event, base64Data) => {
-  let apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || process.env.VITE_GOOGLE_API_KEY || "";
-  
+  // Code extraction uses its own dedicated key: GEMINI_CODE_API_KEY
+  let apiKey = process.env.GEMINI_CODE_API_KEY || "";
   try {
     const envPath = path.join(app.getAppPath(), '.env');
     if (fs.existsSync(envPath)) {
       const text = fs.readFileSync(envPath, 'utf8');
-      const match = text.match(/^(?:VITE_)?(?:GOOGLE|GEMINI)_API_KEY\s*=\s*(.*)$/m);
-      if (match && match[1]) {
-         apiKey = match[1].trim().replace(/^['"]|['"]$/g, '');
-      }
+      const match = text.match(/^GEMINI_CODE_API_KEY\s*=\s*(.*)$/m);
+      if (match && match[1]) apiKey = match[1].trim().replace(/^['"]|['"]$/g, '');
     }
-  } catch (e) {}
+  } catch (e) { }
 
   if (!apiKey) {
-    throw new Error("Missing Google API Key.\\nPlease create a .env file in the project folder containing:\\nVITE_GOOGLE_API_KEY=your_key_here");
+    throw new Error("Missing GEMINI_CODE_API_KEY.\nAdd GEMINI_CODE_API_KEY=your_key to your .env file.");
   }
 
   try {
@@ -706,7 +704,7 @@ ipcMain.handle('extract-code-online', async (event, base64Data) => {
       },
       config: { temperature: 0.1 }
     });
-    
+
     const extractedText = response.text || "";
     console.log("[online] SDK extracted text:", extractedText);
     return extractedText;
@@ -718,20 +716,18 @@ ipcMain.handle('extract-code-online', async (event, base64Data) => {
 
 ipcMain.handle('merge-code-online', async (event, framesList) => {
   if (!framesList || framesList.length === 0) return "";
-  
-  let apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || process.env.VITE_GOOGLE_API_KEY || "";
+  // Code merge uses its own dedicated key: GEMINI_CODE_API_KEY
+  let apiKey = process.env.GEMINI_CODE_API_KEY || "";
   try {
     const envPath = path.join(app.getAppPath(), '.env');
     if (fs.existsSync(envPath)) {
       const text = fs.readFileSync(envPath, 'utf8');
-      const match = text.match(/^(?:VITE_)?(?:GOOGLE|GEMINI)_API_KEY\s*=\s*(.*)$/m);
-      if (match && match[1]) {
-         apiKey = match[1].trim().replace(/^['"]|['"]$/g, '');
-      }
+      const match = text.match(/^GEMINI_CODE_API_KEY\s*=\s*(.*)$/m);
+      if (match && match[1]) apiKey = match[1].trim().replace(/^['"]|['"]$/g, '');
     }
-  } catch (e) {}
+  } catch (e) { }
 
-  if (!apiKey) throw new Error("Missing Google API Key.");
+  if (!apiKey) throw new Error("Missing GEMINI_CODE_API_KEY. Add it to your .env file.");
 
   let prompt = `You are a senior software engineer resolving a code merge.
 
@@ -754,42 +750,239 @@ CRITICAL RULES:
 11. Do NOT include markdown.
 12. Do NOT include explanations.
 
-Here are the extracted frames in chronological order:\\n`;
-  
+Here are the extracted frames in chronological order:\n`;
+
   framesList.forEach((frameCode, i) => {
-    prompt += `--- FRAME \${i+1} ---\\n\${frameCode}\\n\\n`;
+    prompt += `--- FRAME ${i + 1} ---\n${frameCode}\n\n`;
   });
-  
+
   try {
-    console.log(`[Gemini Main] Sending multi-frame merge request via SDK (\${framesList.length} frames)`);
+    console.log(`[Gemini Main] Sending multi-frame merge request via SDK (${framesList.length} frames)`);
     const ai = new GoogleGenAI({ apiKey: apiKey });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: prompt,
       config: { temperature: 0.1 }
     });
-    
+
     let mergedText = response.text || "";
-    
+
     // Strip markdown fences just in case API disobeys rule 11
-    if (mergedText.trim().startsWith("\`\`\`")) {
-      const lines = mergedText.trim().split("\\n");
+    if (mergedText.trim().startsWith("```")) {
+      const lines = mergedText.trim().split("\n");
       if (lines.length > 1) {
         lines.shift();
-        if (lines[lines.length - 1].trim().startsWith("\`\`\`")) {
+        if (lines[lines.length - 1].trim().startsWith("```")) {
           lines.pop();
         }
-        mergedText = lines.join("\\n");
+        mergedText = lines.join("\n");
       }
     }
-    
-    console.log(`[Gemini Main] Multi-frame merge successful. Extracted text length: \${mergedText.length}`);
+
+    console.log(`[Gemini Main] Multi-frame merge successful. Extracted text length: ${mergedText.length}`);
     return mergedText;
   } catch (err) {
     console.error("[Gemini Main] Merge request failed:", err.message);
     throw err;
   }
 });
+
+// -----------------------------------------------
+// Subtitle Translation (isolated from code extraction)
+// -----------------------------------------------
+let subtitleTranslationRunning = false; // prevent concurrent jobs
+
+ipcMain.handle('subtitle/translate', async (event, { segments, targetLanguage }) => {
+  if (!segments || segments.length === 0) throw new Error('No segments to translate');
+  if (!targetLanguage) throw new Error('No target language specified');
+
+  if (subtitleTranslationRunning) {
+    throw new Error('A subtitle translation is already in progress. Please wait for it to finish.');
+  }
+  subtitleTranslationRunning = true;
+
+  try {
+    // Subtitle translation uses its own dedicated key: GROQ_TRANSLATE_API_KEY
+    // Do NOT fall back to OPENAI_API_KEY (STT) or GEMINI_CODE_API_KEY (code extraction)
+    let apiKey = process.env.GROQ_TRANSLATE_API_KEY || '';
+    try {
+      const envPath = path.join(app.getAppPath(), '.env');
+      if (fs.existsSync(envPath)) {
+        const text = fs.readFileSync(envPath, 'utf8');
+        const match = text.match(/^GROQ_TRANSLATE_API_KEY\s*=\s*(.*)$/m);
+        if (match && match[1]) apiKey = match[1].trim().replace(/^['"]|['"]$/g, '');
+      }
+    } catch (e) { }
+
+    if (!apiKey) throw new Error(
+      'GROQ_TRANSLATE_API_KEY missing for subtitle translation.\n' +
+      'Add GROQ_TRANSLATE_API_KEY=gsk_... to your .env file.\n' +
+      'This key is separate from OPENAI_API_KEY and GEMINI_CODE_API_KEY.'
+    );
+
+    const LANG_NAMES = {
+      ta: 'Tamil', en: 'English', si: 'Sinhala',
+      hi: 'Hindi', ar: 'Arabic', fr: 'French', ja: 'Japanese',
+    };
+    const langName = LANG_NAMES[targetLanguage] || targetLanguage;
+
+    // --- Character-budget batching ---
+    // 800 chars ≈ ~200 tokens input → well within Groq free-tier per-request limits
+    const MAX_BATCH_CHARS = 800;
+    const INTER_BATCH_DELAY_MS = 2000; // 2s between batches (conservative for free tier)
+    const MAX_RETRIES = 3;
+
+    const batches = [];
+    let cur = [], curChars = 0;
+    for (const seg of segments) {
+      const lineLen = (seg.text || '').length + 6;
+      if (cur.length > 0 && curChars + lineLen > MAX_BATCH_CHARS) {
+        batches.push(cur);
+        cur = [];
+        curChars = 0;
+      }
+      cur.push(seg);
+      curChars += lineLen;
+    }
+    if (cur.length > 0) batches.push(cur);
+
+    console.log(`[Subtitle] ${segments.length} segments → ${batches.length} batches (max ${MAX_BATCH_CHARS} chars) → ${langName}`);
+
+    const systemPrompt =
+      `You are a professional subtitle translator. ` +
+      `Translate each line into ${langName}. ` +
+      `Keep translations SHORT and natural for subtitle display. ` +
+      `Return ONLY the translated lines in the same order, one per line, prefixed with [index]. ` +
+      `Do NOT add explanations or extra text.`;
+
+    // Helper: call Groq with retry + exponential backoff
+    const callGroq = async (lines, batchLabel) => {
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'llama-3.1-8b-instant',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: lines },
+            ],
+            temperature: 0.2,
+            max_tokens: 512,
+          }),
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          return json.choices?.[0]?.message?.content || '';
+        }
+
+        const errText = await res.text();
+        const is429 = res.status === 429 || errText.includes('rate_limit') || errText.includes('quota');
+
+        if (!is429 || attempt === MAX_RETRIES) {
+          throw new Error(is429
+            ? `Subtitle quota exceeded on ${batchLabel} after ${MAX_RETRIES} retries. ` +
+              `Try again later or reduce video length.`
+            : `Subtitle translation failed (${res.status}) on ${batchLabel}: ${errText.slice(0, 150)}`
+          );
+        }
+
+        // Parse Retry-After header if present, else exponential backoff
+        const retryAfterSec = parseInt(res.headers.get('retry-after') || '0', 10);
+        const backoffMs = retryAfterSec > 0
+          ? retryAfterSec * 1000
+          : Math.min(4000 * Math.pow(2, attempt - 1), 30000); // 4s → 8s → 16s, cap 30s
+
+        console.log(`[Subtitle] ${batchLabel} rate-limited. Attempt ${attempt}/${MAX_RETRIES}. Waiting ${backoffMs}ms...`);
+        await new Promise((r) => setTimeout(r, backoffMs));
+      }
+    };
+
+    // Process batches — completed results are preserved even if later batch fails
+    const allTranslated = [];
+
+    for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
+      const batch = batches[batchIdx];
+      const label = `batch ${batchIdx + 1}/${batches.length}`;
+
+      if (batchIdx > 0) {
+        console.log(`[Subtitle] Waiting ${INTER_BATCH_DELAY_MS}ms before ${label}...`);
+        await new Promise((r) => setTimeout(r, INTER_BATCH_DELAY_MS));
+      }
+
+      const lines = batch.map((s, i) => `[${i}] ${s.text}`).join('\n');
+      console.log(`[Subtitle] ${label}: ${batch.length} segments, ${lines.length} chars`);
+
+      let rawOutput;
+      try {
+        rawOutput = await callGroq(lines, label);
+      } catch (err) {
+        // Preserve already-completed batches, fill rest with originals
+        console.error(`[Subtitle] ${label} failed: ${err.message}. Preserving ${allTranslated.length} completed segments.`);
+        for (let i = batchIdx; i < batches.length; i++) {
+          for (const s of batches[i]) {
+            allTranslated.push({ text: s.text, timestamp: s.timestamp, translatedText: null });
+          }
+        }
+        // Throw with partial info so UI can show a specific warning
+        const partialErr = new Error(
+          `${err.message}\n` +
+          `Partial result: ${allTranslated.length}/${segments.length} segments translated. ` +
+          `Subtitles available for the first ${Math.round((batchIdx / batches.length) * 100)}% of the video.`
+        );
+        throw partialErr;
+      }
+
+      // Parse [index] translated text lines
+      const map = {};
+      for (const line of rawOutput.split('\n')) {
+        const m = line.match(/^\[(\d+)\]\s*(.+)/);
+        if (m) map[parseInt(m[1])] = m[2].trim();
+      }
+
+      // Retry any indices the LLM silently skipped (non-empty source text only)
+      const missedIndices = [];
+      for (let i = 0; i < batch.length; i++) {
+        if (map[i] === undefined && (batch[i].text || '').trim()) missedIndices.push(i);
+      }
+      if (missedIndices.length > 0) {
+        const retryLines = missedIndices
+          .map((origIdx, ri) => `[${ri}] ${batch[origIdx].text}`)
+          .join('\n');
+        console.log(`[Subtitle] ${label}: retrying ${missedIndices.length} missed index(es)...`);
+        try {
+          const retryRaw = await callGroq(retryLines, `${label}-retry`);
+          for (const line of retryRaw.split('\n')) {
+            const m = line.match(/^\[(\d+)\]\s*(.+)/);
+            if (m) {
+              const origIdx = missedIndices[parseInt(m[1])];
+              if (origIdx !== undefined) map[origIdx] = m[2].trim();
+            }
+          }
+        } catch (retryErr) {
+          console.warn(`[Subtitle] ${label} retry failed: ${retryErr.message}`);
+        }
+      }
+
+      for (let i = 0; i < batch.length; i++) {
+        const s = batch[i];
+        allTranslated.push({
+          text: s.text,
+          timestamp: s.timestamp,
+          translatedText: map[i] ?? null,
+        });
+      }
+    }
+
+    console.log(`[Subtitle] Translation complete. ${allTranslated.length}/${segments.length} segments.`);
+    return allTranslated;
+
+  } finally {
+    subtitleTranslationRunning = false;
+  }
+});
+
 
 ipcMain.handle('extract-audio', async (event, videoPath) => {
   if (!videoPath) throw new Error("No video path provided");
@@ -847,8 +1040,8 @@ ipcMain.handle('extract-audio', async (event, videoPath) => {
 
         try {
           fs.unlinkSync(tempRaw);
-        } catch (e) {}
-        
+        } catch (e) { }
+
         return segmentChunks;
       })
     );
@@ -1001,8 +1194,8 @@ ipcMain.handle('offline-transcription/createJob', async (event, params) => {
 
   const model =
     modelPreset === 'fast' ? 'base' :
-    modelPreset === 'high' ? 'medium' :
-    'small';
+      modelPreset === 'high' ? 'medium' :
+        'small';
 
   const totalChunks = Math.ceil(durationSec / safeChunk);
 
@@ -1043,7 +1236,7 @@ ipcMain.handle('offline-transcription/getJob', async (event, jobId) => {
       const segs = readJson(segmentsJson);
       completedChunks = Array.isArray(segs) ? segs.length : completedChunks;
     }
-  } catch {}
+  } catch { }
   return { ...job, completedChunks };
 });
 
@@ -1123,7 +1316,7 @@ ipcMain.handle('offline-transcription/pause', async (event, jobId) => {
 
   if (runningJobs.has(jobId)) {
     const { proc } = runningJobs.get(jobId);
-    try { proc.kill(); } catch (e) {}
+    try { proc.kill(); } catch (e) { }
     runningJobs.delete(jobId);
     sendToRenderer('offline-transcription/progress', { jobId, type: 'job_paused' });
   }
@@ -1141,7 +1334,7 @@ ipcMain.handle('offline-transcription/cancel', async (event, jobId) => {
 
   if (runningJobs.has(jobId)) {
     const { proc } = runningJobs.get(jobId);
-    try { proc.kill(); } catch (e) {}
+    try { proc.kill(); } catch (e) { }
     runningJobs.delete(jobId);
     sendToRenderer('offline-transcription/progress', { jobId, type: 'job_cancelled' });
   }

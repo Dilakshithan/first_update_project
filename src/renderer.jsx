@@ -14,6 +14,9 @@ const APP = () => {
   const [isScanning, setIsScanning] = useState(false);
   const [extractionMode, setExtractionMode] = useState("offline");
 
+  // Shared subtitle overlay state — populated by Sidebar, consumed by VideoPlayer
+  const [subtitleOverlay, setSubtitleOverlay] = useState({ enabled: false, segments: [] });
+
   const openFile = () => {
     videoPlayerRef.current?.openFileDialog?.();
   };
@@ -27,23 +30,25 @@ const APP = () => {
       <Header openFile={openFile} extractionMode={extractionMode} setExtractionMode={setExtractionMode} />
 
       <div style={{ flex: 1, display: "flex", gap: "24px", padding: "24px" }}>
-        <VideoPlayer 
-          ref={videoPlayerRef} 
-          roi={roi} 
-          onRoiChange={(newRoi) => { setRoi(newRoi); setIsSelectingRoi(false); }} 
-          onPlay={onVideoPlay} 
-          isSelectingRoi={isSelectingRoi} 
+        <VideoPlayer
+          ref={videoPlayerRef}
+          roi={roi}
+          onRoiChange={(newRoi) => { setRoi(newRoi); setIsSelectingRoi(false); }}
+          onPlay={onVideoPlay}
+          isSelectingRoi={isSelectingRoi}
           isScanning={isScanning}
+          subtitleOverlay={subtitleOverlay}
         />
-        <Sidebar 
-          ref={sidebarRef} 
-          videoPlayerRef={videoPlayerRef} 
-          roi={roi} 
+        <Sidebar
+          ref={sidebarRef}
+          videoPlayerRef={videoPlayerRef}
+          roi={roi}
           isSelectingRoi={isSelectingRoi}
           onRequestRoiSelect={() => setIsSelectingRoi(true)}
           onCancelRoiSelect={() => { setIsSelectingRoi(false); setRoi(null); }}
           onScanStateChange={(scanning) => setIsScanning(scanning)}
           extractionMode={extractionMode}
+          onSubtitleChange={(enabled, segments) => setSubtitleOverlay({ enabled, segments })}
         />
       </div>
     </div>

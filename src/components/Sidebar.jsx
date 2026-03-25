@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle } f
 import CodeExtractionPanel from "./CodeExtractionPanel";
 import "./Sidebar.css";
 
-const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRoi, onRequestRoiSelect, onCancelRoiSelect, onScanStateChange, extractionMode }, ref) {
+const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRoi, onRequestRoiSelect, onCancelRoiSelect, onScanStateChange, extractionMode, onSubtitleChange }, ref) {
   const [activeTab, setActiveTab] = useState("Code");
 
   // --- Speech / Audio Extraction ---
@@ -27,6 +27,27 @@ const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRo
   const [copilotMessages, setCopilotMessages] = useState([{ role: 'assistant', content: 'Hi! I am your offline AI Copilot. Ask me anything!' }]);
   const [copilotInput, setCopilotInput] = useState("");
   const [copilotLoading, setCopilotLoading] = useState(false);
+
+  // --- Subtitle Generator (online mode only, fully isolated) ---
+  const [subtitleSettings, setSubtitleSettings] = useState({
+    enabled: false,
+    targetLanguage: "ta",
+    showOverlay: false,
+    isGenerating: false,
+    hasGenerated: false,
+  });
+  const SUBTITLE_LANGUAGES = [
+    { label: "Tamil",    code: "ta" },
+    { label: "English",  code: "en" },
+    { label: "Sinhala",  code: "si" },
+    { label: "Hindi",    code: "hi" },
+    { label: "Arabic",   code: "ar" },
+    { label: "French",   code: "fr" },
+    { label: "Japanese", code: "ja" },
+  ];
+  // Isolated subtitle output — never overwrites speechChunks
+  const [translatedSubtitleSegments, setTranslatedSubtitleSegments] = useState([]);
+  const [subtitleError, setSubtitleError] = useState(null);
 
   const handleCopilotSend = async () => {
     if (!copilotInput.trim() || copilotLoading) return;
@@ -55,6 +76,28 @@ const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRo
       }
     }
   }), [speechLoading, speechChunks, speechError, extractionMode]);
+
+  // Auto-trigger online transcription when mode switches to online and video is ready
+  useEffect(() => {
+    if (extractionMode !== "online") return;
+    if (speechLoading || speechChunks.length > 0 || speechError) return;
+    const videoPath = videoPlayerRef?.current?.getVideoPath?.();
+    if (!videoPath) return;
+    console.log("[Sidebar] Mode switched to online with loaded video — auto-starting shared transcription.");
+    handleExtractAudio();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extractionMode]);
+
+  // Notify parent whenever subtitle overlay state changes (read by VideoPlayer)
+  useEffect(() => {
+    if (onSubtitleChange) {
+      onSubtitleChange(
+        subtitleSettings.showOverlay && subtitleSettings.hasGenerated,
+        translatedSubtitleSegments
+      );
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subtitleSettings.showOverlay, subtitleSettings.hasGenerated, translatedSubtitleSegments]);
 
   useEffect(() => {
     if (!window.api?.onOfflineTranscriptionProgress) return;
@@ -310,7 +353,7 @@ const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRo
     <div className="sidebar">
       {/* Tab headers */}
       <div className="tabs">
-        {["Playlist", "Scene", "Code", "Speech", "Copilot", "Info"].map((tab) => (
+        {["Playlist", "Code", "Speech", "Copilot", ...(extractionMode === "online" ? ["Subtitle"] : []), "Info"].map((tab) => (
           <div
             key={tab}
             className={`tab ${activeTab === tab ? "active" : ""}`}
@@ -486,6 +529,171 @@ const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRo
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {activeTab === "Subtitle" && extractionMode === "online" && (
+          <div className="speech-card">
+            <div className="card-title">🎬 Subtitle Generator</div>
+            <div className="card-desc">
+              Translate video speech into subtitles in your chosen language.
+              <br />
+              <i>Online mode only. Uses shared transcript — does not re-run speech-to-text.</i>
+            </div>
+
+            {/* Enable Subtitle Translation toggle */}
+            <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 12 }}>
+              <button
+                className="extract-btn"
+                onClick={() =>
+                  setSubtitleSettings((prev) => ({ ...prev, enabled: !prev.enabled }))
+                }
+                style={{
+                  background: subtitleSettings.enabled ? "#16a34a" : "#374151",
+                  border: `1px solid ${subtitleSettings.enabled ? "#4ade80" : "#6b7280"}`,
+                  minWidth: 160,
+                }}
+              >
+                {subtitleSettings.enabled ? "✅ Translation ON" : "⬜ Enable Translation"}
+              </button>
+            </div>
+
+            {/* Target Language selector */}
+            <div style={{ marginTop: 14 }}>
+              <label style={{ color: "#9ca3af", fontSize: 12, display: "block", marginBottom: 6 }}>
+                Target Language
+              </label>
+              <select
+                value={subtitleSettings.targetLanguage}
+                disabled={!subtitleSettings.enabled}
+                onChange={(e) =>
+                  setSubtitleSettings((prev) => ({ ...prev, targetLanguage: e.target.value }))
+                }
+                style={{
+                  width: "100%",
+                  padding: "8px",
+                  borderRadius: "6px",
+                  background: subtitleSettings.enabled ? "#374151" : "#1f2937",
+                  color: subtitleSettings.enabled ? "white" : "#6b7280",
+                  border: "1px solid #4b5563",
+                  cursor: subtitleSettings.enabled ? "pointer" : "not-allowed",
+                  fontSize: 13,
+                }}
+              >
+                {SUBTITLE_LANGUAGES.map((lang) => (
+                  <option key={lang.code} value={lang.code}>
+                    {lang.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Status indicator */}
+            <div style={{ marginTop: 14, fontSize: 12, color: "#9ca3af" }}>
+              Status:{" "}
+              {subtitleSettings.isGenerating
+                ? <span style={{ color: "#f59e0b" }}>Generating subtitles...</span>
+                : subtitleSettings.hasGenerated
+                  ? <span style={{ color: "#4ade80" }}>✅ Subtitles ready</span>
+                  : subtitleSettings.enabled
+                    ? <span style={{ color: "#4ade80" }}>Ready — translating to {SUBTITLE_LANGUAGES.find(l => l.code === subtitleSettings.targetLanguage)?.label}</span>
+                    : <span>Translation disabled</span>
+              }
+            </div>
+
+            {/* Generate Subtitles button — only when enabled */}
+            {subtitleSettings.enabled && (
+              <div style={{ marginTop: 14 }}>
+                <button
+                  className="extract-btn"
+                  disabled={subtitleSettings.isGenerating}
+                  onClick={async () => {
+                    setSubtitleError(null);
+
+                    // If transcript is still loading, wait — do not show error
+                    if (speechLoading) {
+                      setSubtitleError("Transcript is still being prepared. Please wait a moment and try again.");
+                      return;
+                    }
+
+                    // If no transcript yet, auto-trigger for the user
+                    if (!speechChunks || speechChunks.length === 0) {
+                      setSubtitleError("No transcript yet. Ensure a video is loaded and online Audio-to-Text has completed (Speech tab).");
+                      return;
+                    }
+
+                    console.log(`[Subtitle] Translate requested. Lang: ${subtitleSettings.targetLanguage}, Segments: ${speechChunks.length}`);
+                    setSubtitleSettings((prev) => ({ ...prev, isGenerating: true, hasGenerated: false }));
+
+                    // Build read-only snapshot (speechChunks never modified)
+                    const snapshot = speechChunks.map((chunk) => ({
+                      text: chunk.text,
+                      timestamp: chunk.timestamp,
+                      translatedText: null,
+                    }));
+
+                    try {
+                      // Call isolated subtitle/translate IPC (separate from code extraction)
+                      const result = await window.api.translateSubtitles({
+                        segments: snapshot,
+                        targetLanguage: subtitleSettings.targetLanguage,
+                      });
+                      setTranslatedSubtitleSegments(result);
+                      console.log(`[Subtitle] Translation complete. ${result.length} segments stored.`);
+                      setSubtitleSettings((prev) => ({ ...prev, isGenerating: false, hasGenerated: true }));
+                    } catch (err) {
+                      console.error("[Subtitle] Translation error:", err);
+                      const msg = err?.message || "";
+                      if (msg.includes("GEMINI_API_KEY")) {
+                        setSubtitleError("Gemini API key missing. Add GEMINI_API_KEY to your .env file.");
+                      } else if (msg.includes("429") || msg.includes("quota")) {
+                        setSubtitleError("API quota exceeded. Try again later.");
+                      } else {
+                        setSubtitleError(`Translation failed: ${msg.slice(0, 80)}`);
+                      }
+                      setSubtitleSettings((prev) => ({ ...prev, isGenerating: false, hasGenerated: false }));
+                    }
+                  }}
+                  style={{ width: "100%", background: subtitleSettings.isGenerating ? "#374151" : "#1d4ed8" }}
+                >
+                  {subtitleSettings.isGenerating ? "⏳ Generating..." : "▶ Generate Subtitles"}
+                </button>
+                {subtitleError && (
+                  <div style={{ color: "#ef4444", fontSize: 12, marginTop: 6 }}>
+                    ⚠ {subtitleError}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Show Subtitles on Video toggle — only when enabled and generated */}
+            {subtitleSettings.enabled && (
+              <div style={{ marginTop: 12 }}>
+                <button
+                  className="extract-btn"
+                  disabled={!subtitleSettings.hasGenerated}
+                  onClick={() =>
+                    setSubtitleSettings((prev) => ({ ...prev, showOverlay: !prev.showOverlay }))
+                  }
+                  style={{
+                    width: "100%",
+                    background: !subtitleSettings.hasGenerated
+                      ? "#1f2937"
+                      : subtitleSettings.showOverlay ? "#7c3aed" : "#374151",
+                    color: !subtitleSettings.hasGenerated ? "#6b7280" : "white",
+                    border: `1px solid ${subtitleSettings.hasGenerated ? "#8b5cf6" : "#374151"}`,
+                    cursor: !subtitleSettings.hasGenerated ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {subtitleSettings.showOverlay ? "🟣 Subtitles Visible" : "⬜ Show Subtitles on Video"}
+                </button>
+                {!subtitleSettings.hasGenerated && (
+                  <div style={{ color: "#6b7280", fontSize: 11, marginTop: 4 }}>
+                    Generate subtitles first to enable overlay.
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

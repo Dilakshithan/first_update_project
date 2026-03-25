@@ -8,7 +8,7 @@ import React, {
 import "./VideoPlayer.css";
 import RoiSelector from "./RoiSelector";
 
-const VideoPlayer = forwardRef(function VideoPlayer({ roi, onRoiChange, onPlay, isSelectingRoi, isScanning }, ref) {
+const VideoPlayer = forwardRef(function VideoPlayer({ roi, onRoiChange, onPlay, isSelectingRoi, isScanning, subtitleOverlay }, ref) {
   const videoRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -248,6 +248,40 @@ const VideoPlayer = forwardRef(function VideoPlayer({ roi, onRoiChange, onPlay, 
             </button>
           </div>
         )}
+
+        {/* Subtitle overlay — synced to playback time, shown only when enabled */}
+        {subtitleOverlay?.enabled && subtitleOverlay?.segments?.length > 0 && (() => {
+          const activeSub = subtitleOverlay.segments.find((s) => {
+            const start = Number(s.timestamp?.[0] ?? s.timestamp ?? 0);
+            const end   = Number(s.timestamp?.[1] ?? start + 4);
+            // +0.3s carry-over: fills tiny gaps between adjacent segments without affecting ordering
+            return current >= start && current <= end + 0.3;
+          });
+          if (!activeSub?.translatedText) return null;
+          return (
+            <div style={{
+              position: "absolute",
+              bottom: "10%",
+              left: "50%",
+              transform: "translateX(-50%)",
+              maxWidth: "85%",
+              textAlign: "center",
+              background: "rgba(0,0,0,0.65)",
+              color: "#ffffff",
+              fontSize: "clamp(14px, 2.2vw, 22px)",
+              fontWeight: 500,
+              padding: "6px 16px",
+              borderRadius: "6px",
+              lineHeight: 1.4,
+              textShadow: "0 1px 3px rgba(0,0,0,0.9)",
+              pointerEvents: "none",
+              zIndex: 30,
+              whiteSpace: "pre-wrap",
+            }}>
+              {activeSub.translatedText}
+            </div>
+          );
+        })()}
       </div>
 
       <div className="controls-bar">
