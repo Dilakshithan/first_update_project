@@ -121,6 +121,21 @@ const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRo
       } else if (t === "chunk_failed") {
         setSpeechJobStatus("Running (with errors)");
         setSpeechProgress((p) => ({ ...p, statusText: `Chunk ${payload.chunkIndex} failed (will continue)` }));
+      } else if (t === "error") {
+        setSpeechJobStatus("Error");
+        setSpeechProgress((p) => ({ ...p, statusText: "Error" }));
+        setSpeechError(payload.message || "Unknown worker error");
+        setSpeechLoading(false);
+      } else if (t === "worker_exit") {
+        setSpeechLoading((prevLoading) => {
+          // If it was still loading but the worker died, it crashed or was killed
+          if (prevLoading) {
+             setSpeechJobStatus(payload.code === 0 ? "Completed" : "Worker Stopped");
+             setSpeechProgress((p) => ({ ...p, statusText: `Worker stopped (code ${payload.code})` }));
+             if (payload.code !== 0 && !speechError) setSpeechError(`Transcription worker missing or crashed (code: ${payload.code}). Make sure Python and 'faster-whisper' are correctly installed!`);
+          }
+          return false;
+        });
       } else if (t === "job_completed") {
         setSpeechJobStatus("Completed");
         setSpeechProgress((p) => ({ ...p, statusText: "Completed" }));

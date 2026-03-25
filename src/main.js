@@ -301,7 +301,7 @@ let transcriber = null;
 // Offline modes:
 // - 0-10 min: "normal offline" (Transformers.js in main process)
 // - 10+ min: "long offline" (Python worker, chunked + persisted)
-const OFFLINE_NORMAL_MAX_SEC = 10 * 60;
+const OFFLINE_NORMAL_MAX_SEC = 0; // Force all videos to use the queue so Pause/Cancel appear
 const runningJobs = new Map(); // jobId -> { proc }
 
 function ensureDir(p) {
@@ -1054,7 +1054,7 @@ ipcMain.handle('offline-transcription/getSegments', async (event, jobId) => {
   return Array.isArray(segs) ? segs : [];
 });
 
-ipcMain.handle('offline-transcription/start', async (event, jobId) => {
+async function startJobInternal(jobId) {
   const paths = getJobPaths(jobId);
   if (!fs.existsSync(paths.jobJson)) throw new Error('Job not found');
   if (runningJobs.has(jobId)) return { ok: true, alreadyRunning: true };
@@ -1106,6 +1106,10 @@ ipcMain.handle('offline-transcription/start', async (event, jobId) => {
   });
 
   return { ok: true };
+}
+
+ipcMain.handle('offline-transcription/start', async (event, jobId) => {
+  return await startJobInternal(jobId);
 });
 
 ipcMain.handle('offline-transcription/pause', async (event, jobId) => {
@@ -1113,8 +1117,16 @@ ipcMain.handle('offline-transcription/pause', async (event, jobId) => {
   if (!fs.existsSync(jobJson)) throw new Error('Job not found');
   const job = readJson(jobJson);
   job.requestedAction = 'pause';
+  job.status = 'paused';
   job.updatedAt = new Date().toISOString();
   writeJsonAtomic(jobJson, job);
+
+  if (runningJobs.has(jobId)) {
+    const { proc } = runningJobs.get(jobId);
+    try { proc.kill(); } catch (e) {}
+    runningJobs.delete(jobId);
+    sendToRenderer('offline-transcription/progress', { jobId, type: 'job_paused' });
+  }
   return { ok: true };
 });
 
@@ -1123,8 +1135,16 @@ ipcMain.handle('offline-transcription/cancel', async (event, jobId) => {
   if (!fs.existsSync(jobJson)) throw new Error('Job not found');
   const job = readJson(jobJson);
   job.requestedAction = 'cancel';
+  job.status = 'cancelled';
   job.updatedAt = new Date().toISOString();
   writeJsonAtomic(jobJson, job);
+
+  if (runningJobs.has(jobId)) {
+    const { proc } = runningJobs.get(jobId);
+    try { proc.kill(); } catch (e) {}
+    runningJobs.delete(jobId);
+    sendToRenderer('offline-transcription/progress', { jobId, type: 'job_cancelled' });
+  }
   return { ok: true };
 });
 
@@ -1137,5 +1157,5 @@ ipcMain.handle('offline-transcription/resume', async (event, jobId) => {
   job.updatedAt = new Date().toISOString();
   writeJsonAtomic(jobJson, job);
   // resume is just start again; worker skips completed chunks
-  return await ipcMain.handlers.get('offline-transcription/start')(event, jobId);
+  return await startJobInternal(jobId);
 });
