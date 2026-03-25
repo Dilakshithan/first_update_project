@@ -24,26 +24,26 @@ const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRo
   const [forceSlowOffline, setForceSlowOffline] = useState(false);
 
   // --- Copilot Chat ---
-  const [copilotMessages, setCopilotMessages] = useState([{role: 'assistant', content: 'Hi! I am your offline AI Copilot. Ask me anything!'}]);
+  const [copilotMessages, setCopilotMessages] = useState([{ role: 'assistant', content: 'Hi! I am your offline AI Copilot. Ask me anything!' }]);
   const [copilotInput, setCopilotInput] = useState("");
   const [copilotLoading, setCopilotLoading] = useState(false);
 
   const handleCopilotSend = async () => {
-    if(!copilotInput.trim() || copilotLoading) return;
-    const userMsg = {role: 'user', content: copilotInput};
+    if (!copilotInput.trim() || copilotLoading) return;
+    const userMsg = { role: 'user', content: copilotInput };
     const newMessages = [...copilotMessages, userMsg];
     setCopilotMessages(newMessages);
     setCopilotInput("");
     setCopilotLoading(true);
-  
+
     try {
-       const reply = await window.api.chatCopilot(newMessages);
-       setCopilotMessages([...newMessages, {role: 'assistant', content: reply}]);
-    } catch(e) {
-       console.error(e);
-       setCopilotMessages([...newMessages, {role: 'assistant', content: 'Error: ' + e.message}]);
+      const reply = await window.api.chatCopilot(newMessages);
+      setCopilotMessages([...newMessages, { role: 'assistant', content: reply }]);
+    } catch (e) {
+      console.error(e);
+      setCopilotMessages([...newMessages, { role: 'assistant', content: 'Error: ' + e.message }]);
     } finally {
-       setCopilotLoading(false);
+      setCopilotLoading(false);
     }
   };
 
@@ -58,7 +58,7 @@ const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRo
 
   useEffect(() => {
     if (!window.api?.onOfflineTranscriptionProgress) return;
-    
+
     let lastUpdateTime = 0;
     let pendingPayload = null;
     let throttleTimer = null;
@@ -269,11 +269,11 @@ const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRo
       {/* Tab content */}
       <div className="tab-content">
         {activeTab === "Code" && (
-          <CodeExtractionPanel 
-            videoPlayerRef={videoPlayerRef} 
-            roi={roi} 
-            isSelectingRoi={isSelectingRoi} 
-            onRequestRoiSelect={onRequestRoiSelect} 
+          <CodeExtractionPanel
+            videoPlayerRef={videoPlayerRef}
+            roi={roi}
+            isSelectingRoi={isSelectingRoi}
+            onRequestRoiSelect={onRequestRoiSelect}
             onCancelRoiSelect={onCancelRoiSelect}
             onScanStateChange={onScanStateChange}
             extractionMode={extractionMode}
@@ -356,7 +356,7 @@ const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRo
                 />
                 <div style={{ marginTop: 10, maxHeight: "300px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
                   {speechChunks
-                    .filter(c => (c.text||"").toLowerCase().includes(speechSearchTerm.toLowerCase()))
+                    .filter(c => (c.text || "").toLowerCase().includes(speechSearchTerm.toLowerCase()))
                     .map((chunk, idx) => (
                       <div
                         key={idx}
@@ -375,8 +375,8 @@ const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRo
                           {chunk.text}
                         </div>
                       </div>
-                  ))}
-                  {speechChunks.filter(c => (c.text||"").toLowerCase().includes(speechSearchTerm.toLowerCase())).length === 0 && (
+                    ))}
+                  {speechChunks.filter(c => (c.text || "").toLowerCase().includes(speechSearchTerm.toLowerCase())).length === 0 && (
                     <div style={{ color: "#9ca3af", fontStyle: "italic", fontSize: 13 }}>No matches found.</div>
                   )}
                 </div>
@@ -388,24 +388,24 @@ const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRo
         {activeTab === "Copilot" && (
           <div className="copilot-card">
             <div className="card-title">🤖 Offline Copilot</div>
-            <div className="card-desc">Ask questions locally. No data leaves your machine. <br/><i>Note: Offline AI runs purely on your CPU and can take 15-30 seconds to type a response.</i></div>
-            
+            <div className="card-desc">Ask questions locally. No data leaves your machine. <br /><i>Note: Offline AI runs purely on your CPU and can take 15-30 seconds to type a response.</i></div>
+
             <div style={{ display: 'flex', flexDirection: 'column', height: '350px', marginTop: 10 }}>
               <div style={{ flex: 1, overflowY: 'auto', background: '#1f2937', borderRadius: '6px', padding: '10px', marginBottom: '10px', border: '1px solid #374151' }}>
                 {copilotMessages.map((msg, idx) => (
                   <div key={idx} style={{ marginBottom: 10, textAlign: msg.role === 'user' ? 'right' : 'left' }}>
-                     <span style={{ 
-                       display: 'inline-block', 
-                       padding: '8px 12px', 
-                       borderRadius: '8px', 
-                       background: msg.role === 'user' ? '#3b82f6' : '#374151',
-                       color: '#fff',
-                       maxWidth: '90%',
-                       wordWrap: 'break-word',
-                       whiteSpace: 'pre-wrap'
-                     }}>
-                       {msg.content}
-                     </span>
+                    <span style={{
+                      display: 'inline-block',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      background: msg.role === 'user' ? '#3b82f6' : '#374151',
+                      color: '#fff',
+                      maxWidth: '90%',
+                      wordWrap: 'break-word',
+                      whiteSpace: 'pre-wrap'
+                    }}>
+                      {msg.content}
+                    </span>
                   </div>
                 ))}
                 {copilotLoading && (
@@ -414,18 +414,18 @@ const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRo
                   </div>
                 )}
               </div>
-              
+
               <div style={{ display: 'flex', gap: 5 }}>
-                <input 
-                   type="text" 
-                   value={copilotInput}
-                   onChange={e => setCopilotInput(e.target.value)}
-                   onKeyDown={e => e.key === 'Enter' && handleCopilotSend()}
-                   placeholder="Ask a question..."
-                   style={{ flex: 1, padding: '8px', borderRadius: '6px', background: '#374151', color: 'white', border: '1px solid #4b5563' }}
+                <input
+                  type="text"
+                  value={copilotInput}
+                  onChange={e => setCopilotInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleCopilotSend()}
+                  placeholder="Ask a question..."
+                  style={{ flex: 1, padding: '8px', borderRadius: '6px', background: '#374151', color: 'white', border: '1px solid #4b5563' }}
                 />
                 <button className="extract-btn" onClick={handleCopilotSend} disabled={copilotLoading}>
-                   Send
+                  Send
                 </button>
               </div>
             </div>

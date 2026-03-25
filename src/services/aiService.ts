@@ -9,11 +9,11 @@ export function getAI() {
     // Antigravity automatically injects this environment variable.
     // DO NOT use import.meta.env for the Gemini key in this environment.
     const apiKey = process.env.GEMINI_API_KEY;
-    
+
     if (!apiKey) {
       throw new Error("GEMINI_API_KEY is not set by the environment");
     }
-    
+
     // Initialize the client with the key
     ai = new GoogleGenAI({ apiKey });
   }
@@ -25,7 +25,7 @@ export async function extractTextOnline(canvas: HTMLCanvasElement): Promise<stri
   try {
     // Grab the initialized client
     const aiClient = getAI();
-    
+
     const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
     const base64EncodeString = dataUrl.split(',')[1];
 
@@ -56,7 +56,7 @@ export async function mergeCodeBlocksOnline(blocks: string[]): Promise<string> {
 
   try {
     const aiClient = getAI();
-    
+
     const prompt = `You are an expert software engineer.
 
 The following text is extracted from a video using OCR. It contains:

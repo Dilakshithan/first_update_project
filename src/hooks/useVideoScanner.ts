@@ -43,7 +43,7 @@ export function useVideoScanner({
     isOnlineModeRef.current = isOnlineMode;
   }, [isOnlineMode]);
 
-  const processFrameRef = useRef<() => Promise<void>>(async () => {});
+  const processFrameRef = useRef<() => Promise<void>>(async () => { });
 
   const processFrame = useCallback(async () => {
     if (!videoRef.current || !roi || isProcessing || videoRef.current.ended) {
@@ -58,13 +58,13 @@ export function useVideoScanner({
       onStopScanning();
       return;
     }
-    
+
     // Create a canvas to hold the current ROI
     const currentCanvas = document.createElement('canvas');
     currentCanvas.width = roi.width;
     currentCanvas.height = roi.height;
     const ctx = currentCanvas.getContext('2d');
-    
+
     if (!ctx) return;
 
     // Draw the ROI portion of the video onto the canvas
@@ -92,12 +92,12 @@ export function useVideoScanner({
 
         if (newText.trim()) {
           codeBlocksRef.current.push(newText.trim());
-          
+
           // EXPLANATION: Why rearranging during scan caused bad live updates.
           // Before, running 'mergeCode' over every frame was aggressively matching and discarding code 
           // if it falsely flagged it as a "duplicate", completely swallowing small new typing additions.
           // It also executed heavy String/Levenshtein parsing on the UI thread, blocking rapid captures.
-          
+
           // EXPLANATION: How new logic separates live collection from final merge.
           // During scanning mode, the sole goal is collection and fast preview. We just blindly append 
           // strings here. It is lightning fast, skips zero updates, and keeps 'isProcessing' extremely short 
@@ -108,9 +108,9 @@ export function useVideoScanner({
             return prevCode + '\n\n/* ... live extraction ... */\n\n' + newText.trim();
           });
         }
-        
+
         setFrameCount((prev: number) => prev + 1);
-        
+
         // Update previous canvas only if we successfully processed it
         prevCanvasRef.current = currentCanvas;
       } catch (error) {
@@ -133,13 +133,13 @@ export function useVideoScanner({
       setFrameCount(0);
       scanIntervalRef.current = window.setInterval(() => {
         processFrameRef.current();
-      }, 500); // Changed from 1000ms to 500ms to capture much faster typs while relying on the 'isProcessing' lock to prevent overlap
+      }, 1000); // Set to 4500ms (4.5s) to stay safely under the Gemini API 15 requests/minute free-tier quota
     } else {
       // Stop scanning
       if (scanIntervalRef.current) {
         clearInterval(scanIntervalRef.current);
       }
-      
+
       // Finalize code if we have blocks
       if (codeBlocksRef.current.length > 0) {
         const finalize = async () => {
@@ -147,7 +147,7 @@ export function useVideoScanner({
           try {
             // 1. Strongly deduplicate locally first based on string fuzziness
             const deduplicatedLocalCode = rearrangeAndDeduplicate(codeBlocksRef.current);
-            
+
             let finalCode = '';
             if (isOnlineModeRef.current) {
               // 2. Send the cleaned, deduped array to Gemini (saves tokens, massively reduces hallucination)

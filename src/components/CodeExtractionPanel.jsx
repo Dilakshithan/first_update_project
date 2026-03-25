@@ -19,7 +19,7 @@ export default function CodeExtractionPanel({ videoPlayerRef, roi, isSelectingRo
   const lastSigRef = useRef(null);            // last frame signature
   const lastOcrAtRef = useRef(0);             // last OCR timestamp (real time ms)
   const lastAcceptedTextRef = useRef("");     // last accepted OCR snapshot text
-  
+
   const geminiBlocksRef = useRef([]);
   const lastBase64LengthRef = useRef(0);
   const lineMapRef = useRef(new Map());       // Map<lineNumber, { text, qualityScore, sourceFrame }>
@@ -109,7 +109,7 @@ export default function CodeExtractionPanel({ videoPlayerRef, roi, isSelectingRo
       const code = codeOrSkip;
       if (!stopRef.current) {
         geminiBlocksRef.current.push(code);
-        
+
         const incomingLines = code.split("\n");
         const merged = mergeUnnumberedLines(unnumberedLinesRef.current, incomingLines);
         unnumberedLinesRef.current = merged;
@@ -184,11 +184,15 @@ export default function CodeExtractionPanel({ videoPlayerRef, roi, isSelectingRo
 
     lastAcceptedTextRef.current = normalizedFrameText;
     if (sessionModeRef.current === "numbered") {
-      setStatus(
-        trusted.length > 0
-          ? `Snapshot captured (${trusted.length} numbered lines)`
-          : "Snapshot ignored (no trusted numbered lines)"
-      );
+      // Show a live preview of sorted, numbered-stripped code
+      if (trusted.length > 0) {
+        const currentPreview = finalizeOrderedCode(lineMapRef.current);
+        console.log(`[Preview Update - Numbered] Length: ${currentPreview.length} chars, Lines: ${lineMapRef.current.size}`);
+        setPreviewOutput(currentPreview);
+        setStatus(`Snapshot captured (${trusted.length} numbered lines, ${lineMapRef.current.size} total)`);
+      } else {
+        setStatus("Snapshot ignored (no trusted numbered lines)");
+      }
       return;
     }
 
@@ -201,9 +205,12 @@ export default function CodeExtractionPanel({ videoPlayerRef, roi, isSelectingRo
       return;
     }
 
-    const merged = mergeUnnumberedLines(unnumberedLinesRef.current, incomingLines);
-    unnumberedLinesRef.current = merged;
+    const mergedPreview = mergeUnnumberedLines(unnumberedLinesRef.current, incomingLines);
+    unnumberedLinesRef.current = mergedPreview;
     lastUnnumberedBlockSigRef.current = blockSig;
+    const previewOut = mergedPreview.join("\n");
+    console.log(`[Preview Update] Length: ${previewOut.length} chars (Offline)`);
+    setPreviewOutput(previewOut);
     setStatus(
       incomingLines.length > 0
         ? `Snapshot captured (${incomingLines.length} lines)`
@@ -290,7 +297,7 @@ export default function CodeExtractionPanel({ videoPlayerRef, roi, isSelectingRo
     setStatus("Scan stopped - finalizing");
     if (checkTimerRef.current) clearTimeout(checkTimerRef.current);
     checkTimerRef.current = null;
-    
+
     // Stop the ROI selection immediately so the user can interact while merging completes
     onCancelRoiSelect?.();
 
@@ -422,10 +429,10 @@ export default function CodeExtractionPanel({ videoPlayerRef, roi, isSelectingRo
         Status: {status}
       </div>
 
-      <div className="output-area" style={{ 
-        whiteSpace: "pre-wrap", 
-        fontSize: "15px", 
-        flex: "1 1 0px", 
+      <div className="output-area" style={{
+        whiteSpace: "pre-wrap",
+        fontSize: "15px",
+        flex: "1 1 0px",
         minHeight: 0,
         fontFamily: "'Fira Code', 'Courier New', monospace",
         border: "1px solid #4ade80",

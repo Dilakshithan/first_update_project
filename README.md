@@ -34,6 +34,15 @@ Before running this project on a new PC, make sure you have the following instal
    ```
    *This process might take a few minutes. It will create a `models/` directory in the root folder containing the downloaded model state.*
 
+5. **Set Up Gemini API Key (For Online Code Extraction)**
+   The project uses the Gemini API for highly accurate, multi-frame online code extraction. You must provide a generic API key for the application to interact with Google's servers.
+   - Get a free API key from [Google AI Studio](https://aistudio.google.com/app/apikey).
+   - Create a file named `.env` in the root directory of the project.
+   - Add the following line to the file:
+     ```env
+     GEMINI_API_KEY=your_actual_api_key_here
+     ```
+
 ## Running the Application
 
 To start the application in development mode with HMR (Hot Module Replacement):
