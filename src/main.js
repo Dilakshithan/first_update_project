@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, safeStorage } from 'electron';
 import { GoogleGenAI } from "@google/genai";
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
@@ -10,6 +10,204 @@ import os from 'os';
 import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import { Worker } from 'node:worker_threads';
+
+let lastDotEnvPathLoaded = null;
+
+function shouldApplyDotEnvValue(key, newVal) {
+  if (newVal === undefined || newVal === null) return false;
+  // Always override OPENAI_API_KEY during refresh so we pick up changes without a restart!
+  if (key === 'OPENAI_API_KEY') return true;
+  
+  const cur = process.env[key];
+  if (cur === undefined || !String(cur).trim()) return true;
+  return false;
+}
+
+/** Parse `.env` into `process.env` (dotenv-like; does not replace non-empty vars except OPENAI_API_KEY when empty). */
+function applyDotEnvFile(filePath) {
+  let raw = fs.readFileSync(filePath, 'utf8');
+  if (raw.charCodeAt(0) === 0xfeff) raw = raw.slice(1);
+  let applied = false;
+  for (let line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq <= 0) continue;
+    let key = trimmed.slice(0, eq).trim();
+    if (key.startsWith('export ')) key = key.slice(7).trim();
+    if (!key) continue;
+    let val = trimmed.slice(eq + 1).trim();
+    if (key === 'OPENAI_API_KEY' && !val) continue;
+    if (
+      (val.startsWith('"') && val.endsWith('"')) ||
+      (val.startsWith("'") && val.endsWith("'"))
+    ) {
+      val = val.slice(1, -1);
+    }
+    if (shouldApplyDotEnvValue(key, val)) {
+      process.env[key] = val;
+      applied = true;
+    }
+  }
+  return applied;
+}
+
+function walkAncestorsDotEnv(tryLoad, startDir) {
+  if (!startDir) return;
+  let dir = path.resolve(startDir);
+  for (let i = 0; i < 16; i++) {
+    tryLoad(path.join(dir, '.env'));
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+}
+
+/**
+ * Re-scan `.env` files (safe to call before each online request).
+ * Checks: cwd + ancestors, Electron app path + ancestors, main bundle dir (e.g. .vite/build) + ancestors, app userData.
+ */
+function refreshEnvFromDotFiles() {
+  lastDotEnvPathLoaded = null;
+  const seen = new Set();
+  const tryLoad = (p) => {
+    if (!p || seen.has(p)) return;
+    seen.add(p);
+    if (!fs.existsSync(p)) return;
+    if (!lastDotEnvPathLoaded) lastDotEnvPathLoaded = p;
+    const applied = applyDotEnvFile(p);
+    if (applied) console.log('[env] Applied keys from', p);
+  };
+
+  walkAncestorsDotEnv(tryLoad, process.cwd());
+  try {
+    walkAncestorsDotEnv(tryLoad, app.getAppPath());
+  } catch (_) {
+    // app not ready in theory; ignore
+  }
+  // Bundled dev main lives in project/.vite/build → walk from project root too
+  walkAncestorsDotEnv(tryLoad, path.join(__dirname, '..', '..'));
+  walkAncestorsDotEnv(tryLoad, path.join(__dirname, '..'));
+
+  try {
+    tryLoad(path.join(app.getPath('userData'), '.env'));
+  } catch (_) {}
+}
+
+const PROJECT_PACKAGE_NAME = 'empty_one';
+
+function findProjectRootForDotEnv() {
+  const startDirs = [];
+  try {
+    startDirs.push(process.cwd());
+  } catch (_e) {}
+  try {
+    startDirs.push(app.getAppPath());
+  } catch (_e) {}
+  startDirs.push(path.join(__dirname, '..', '..'));
+  startDirs.push(path.join(__dirname, '..'));
+
+  const seenRoots = new Set();
+  for (const start of startDirs) {
+    if (!start) continue;
+    let dir = path.resolve(start);
+    for (let i = 0; i < 16; i++) {
+      if (seenRoots.has(dir)) break;
+      seenRoots.add(dir);
+      const pkg = path.join(dir, 'package.json');
+      if (fs.existsSync(pkg)) {
+        try {
+          const j = JSON.parse(fs.readFileSync(pkg, 'utf8'));
+          if (j && j.name === PROJECT_PACKAGE_NAME) return dir;
+        } catch (_e) {}
+      }
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+  }
+  const fallback = path.resolve(path.join(__dirname, '..', '..'));
+  if (fs.existsSync(path.join(fallback, 'package.json'))) return fallback;
+  return null;
+}
+
+function mergeOpenAiKeyIntoDotEnvFile(filePath, apiKey) {
+  const trimmed = String(apiKey || '').trim();
+  if (!trimmed) throw new Error('API key is empty');
+  let raw = '';
+  if (fs.existsSync(filePath)) raw = fs.readFileSync(filePath, 'utf8');
+  if (raw.charCodeAt(0) === 0xfeff) raw = raw.slice(1);
+  const lines = raw.split(/\r?\n/);
+  const out = [];
+  let replaced = false;
+  for (const line of lines) {
+    const t = line.trim();
+    if (t && !t.startsWith('#')) {
+      const eq = t.indexOf('=');
+      if (eq > 0) {
+        let k = t.slice(0, eq).trim();
+        if (k.startsWith('export ')) k = k.slice(7).trim();
+        if (k === 'OPENAI_API_KEY') {
+          if (!replaced) {
+            out.push(`OPENAI_API_KEY=${trimmed}`);
+            replaced = true;
+          }
+          continue;
+        }
+      }
+    }
+    out.push(line);
+  }
+  if (!replaced) {
+    if (out.length && out[out.length - 1] !== '') out.push('');
+    out.push(`OPENAI_API_KEY=${trimmed}`);
+  }
+  fs.writeFileSync(filePath, out.join('\n'), 'utf8');
+}
+
+function openAiKeyStorePath() {
+  return path.join(app.getPath('userData'), 'openai-credential.bin');
+}
+
+function hasAnyPersistedOpenAiKeyFile() {
+  const out = openAiKeyStorePath();
+  return fs.existsSync(out) || fs.existsSync(`${out}.plain.txt`);
+}
+
+function persistOpenAiKey(key) {
+  const trimmed = String(key || '').trim();
+  if (!trimmed) return;
+  try {
+    const out = openAiKeyStorePath();
+    if (safeStorage.isEncryptionAvailable()) {
+      fs.writeFileSync(out, safeStorage.encryptString(trimmed));
+    } else {
+      fs.writeFileSync(`${out}.plain.txt`, trimmed, 'utf8');
+    }
+    console.log('[openai] Stored API key in app data (OS encryption when available).');
+  } catch (e) {
+    console.warn('[openai] Could not save API key:', e?.message || e);
+  }
+}
+
+function loadPersistedOpenAiKey() {
+  try {
+    const out = openAiKeyStorePath();
+    if (fs.existsSync(out)) {
+      try {
+        return safeStorage.decryptString(fs.readFileSync(out)).trim();
+      } catch (e) {
+        console.warn('[openai] Could not decrypt credential file (try pasting key again):', e?.message || e);
+      }
+    }
+    const plain = `${out}.plain.txt`;
+    if (fs.existsSync(plain)) return fs.readFileSync(plain, 'utf8').trim();
+  } catch (e) {
+    console.warn('[openai] Could not read saved API key:', e?.message || e);
+  }
+  return null;
+}
+
 if (started) {
   app.quit();
 }
@@ -41,7 +239,9 @@ const createWindow = () => {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
+  refreshEnvFromDotFiles();
   createWindow();
+
 
   // On OS X it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
@@ -100,10 +300,8 @@ try {
 let transcriber = null;
 // Offline modes:
 // - 0-10 min: "normal offline" (Transformers.js in main process)
-// - 10-30 min: "long offline" (Python worker, chunked + persisted)
-// - 30+ min: recommend online (but we can still allow an optional slow offline job later)
+// - 10+ min: "long offline" (Python worker, chunked + persisted)
 const OFFLINE_NORMAL_MAX_SEC = 10 * 60;
-const OFFLINE_LONG_MAX_SEC = 30 * 60;
 const runningJobs = new Map(); // jobId -> { proc }
 
 function ensureDir(p) {
@@ -249,12 +447,15 @@ function runChatInWorker(modelsPath, prompt) {
   });
 }
 
-let whisperWorker = null;
+const WHISPER_WORKERS = [];
+const MAX_OFFLINE_WORKERS = 3;
+let workerIndex = 0;
+let whisperWorkerCode = null;
 
 function getWhisperWorker() {
-  if (whisperWorker) return whisperWorker;
-
-  const workerCode = `
+  if (WHISPER_WORKERS.length < MAX_OFFLINE_WORKERS) {
+    if (!whisperWorkerCode) {
+      whisperWorkerCode = `
     const { parentPort } = require('node:worker_threads');
     
     let transcriber = null;
@@ -302,9 +503,15 @@ function getWhisperWorker() {
       }
     });
   `;
-
-  whisperWorker = new Worker(workerCode, { eval: true });
-  return whisperWorker;
+    }
+    const worker = new Worker(whisperWorkerCode, { eval: true });
+    WHISPER_WORKERS.push(worker);
+    return worker;
+  }
+  
+  const worker = WHISPER_WORKERS[workerIndex];
+  workerIndex = (workerIndex + 1) % WHISPER_WORKERS.length;
+  return worker;
 }
 
 function runTranscriptionInWorker(modelsPath, float32Data, chunkLengthSec) {
@@ -356,6 +563,89 @@ function extractRawFloatAudio(videoPath, outputPath, startSec = 0, durationSec =
 
     cmd.save(outputPath).on('end', resolve).on('error', reject);
   });
+}
+
+/** One ffmpeg pass: mono 16 kHz MP3 (small upload, works with bundled ffmpeg-static). */
+function extractMp3AudioSegment(videoPath, outputPath, startSec = 0, durationSec = 0) {
+  return new Promise((resolve, reject) => {
+    const cmd = ffmpeg(videoPath).outputOptions([
+      '-vn',
+      '-ac', '1',
+      '-ar', '16000',
+      '-c:a', 'libmp3lame',
+      '-b:a', '32k',
+    ]);
+    if (startSec > 0) cmd.setStartTime(startSec);
+    if (durationSec > 0) cmd.setDuration(durationSec);
+    cmd.save(outputPath).on('end', resolve).on('error', reject);
+  });
+}
+
+function resolveOpenAiKey(explicitKey) {
+  const fromUi = (explicitKey !== undefined && explicitKey !== null ? String(explicitKey) : '').trim();
+  if (fromUi) return fromUi;
+  const fromEnv = (process.env.OPENAI_API_KEY || '').trim();
+  if (fromEnv) return fromEnv;
+  const saved = loadPersistedOpenAiKey();
+  return saved || null;
+}
+
+async function verifyOpenAiKeyWithApi(apiKey) {
+  const res = await fetch('https://api.groq.com/openai/v1/models', {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Key check failed (${res.status}): ${errText.slice(0, 400)}`);
+  }
+}
+
+function mapOpenAiVerboseJsonToChunks(verboseJson, timeOffsetSec = 0) {
+  const segments = Array.isArray(verboseJson?.segments) ? verboseJson.segments : [];
+  if (segments.length === 0 && verboseJson?.text) {
+    const dur = Number(verboseJson?.duration || 0);
+    return [
+      {
+        text: String(verboseJson.text || '').trim(),
+        timestamp: [timeOffsetSec, timeOffsetSec + (Number.isFinite(dur) ? dur : 0)],
+      },
+    ];
+  }
+  return segments.map((s) => ({
+    text: String(s?.text || '').trim(),
+    timestamp: [timeOffsetSec + Number(s?.start || 0), timeOffsetSec + Number(s?.end ?? s?.start ?? 0)],
+  }));
+}
+
+/** Shorter segments + parallel API calls reduce wall-clock vs one huge upload (typical speech demo). */
+const ONLINE_TRANSCRIBE_CHUNK_SEC = 2 * 60;
+const ONLINE_TRANSCRIBE_PARALLEL = 4;
+
+async function transcribeMp3WithOpenAI(mp3Path, apiKey) {
+  const buf = await fs.promises.readFile(mp3Path);
+  const form = new FormData();
+  form.append('file', new Blob([buf]), path.basename(mp3Path));
+  form.append('model', 'whisper-large-v3');
+  form.append('response_format', 'verbose_json');
+  form.append('temperature', '0');
+  const whisperLang = (process.env.OPENAI_WHISPER_LANG ?? 'en').trim();
+  if (whisperLang) form.append('language', whisperLang);
+
+  const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: form,
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Cloud transcription failed (${res.status}): ${errText.slice(0, 600)}`);
+  }
+
+  const json = await res.json();
+  return mapOpenAiVerboseJsonToChunks(json, 0);
 }
 
 ipcMain.handle('chat-copilot', async (event, messages) => {
@@ -514,49 +804,173 @@ ipcMain.handle('extract-audio', async (event, videoPath) => {
     ? path.join(app.getAppPath(), 'models')
     : path.join(process.resourcesPath, 'models');
 
-  console.log("Waking up Transformers.js worker thread...");
+  console.log("Waking up Transformers.js worker threads...");
   getWhisperWorker();
 
-  // 3. Segment strategy:
-  // - Short videos: single pass (fastest)
-  // - Long videos: smaller segments to avoid memory overload and long freezes
-  const isLongVideo = durationSec >= 5 * 60;
-  const segmentSec = isLongVideo ? 120 : Math.max(30, Math.ceil(durationSec));
-  const chunkLengthSec = isLongVideo ? 20 : 30;
-  const allChunks = [];
-
-  for (let segmentStart = 0; segmentStart < Math.max(durationSec, 1); segmentStart += segmentSec) {
-    const segmentDuration = Math.min(segmentSec, Math.max(durationSec - segmentStart, 0));
-    const tempRaw = path.join(os.tmpdir(), `audio-raw-${Date.now()}-${Math.floor(segmentStart)}.f32`);
-    console.log(`Extracting audio segment: ${segmentStart.toFixed(1)}s -> ${(segmentStart + segmentDuration).toFixed(1)}s`);
-
-    await extractRawFloatAudio(videoPath, tempRaw, segmentStart, segmentDuration);
-
-    console.log("Reading raw audio...");
-    const buffer = await fs.promises.readFile(tempRaw);
-    const sampleCount = Math.floor(buffer.length / 4);
-    const float32Data = new Float32Array(buffer.buffer, buffer.byteOffset, sampleCount);
-
-    console.log(`Transcribing segment ${Math.floor(segmentStart)}s with ${sampleCount} samples...`);
-    const output = await runTranscriptionInWorker(modelsPath, float32Data, chunkLengthSec);
-
-    const segmentChunks = (output?.chunks || []).map((chunk) => {
-      const start = Number(chunk?.timestamp?.[0] || 0) + segmentStart;
-      const end = Number(chunk?.timestamp?.[1] || start) + segmentStart;
-      return {
-        ...chunk,
-        timestamp: [start, end]
-      };
-    });
-
-    allChunks.push(...segmentChunks);
-
-    try {
-      fs.unlinkSync(tempRaw);
-    } catch (e) {}
+  const segmentSec = 30; // 30s max chunks
+  const windows = [];
+  for (let start = 0; start < durationSec; start += segmentSec) {
+    const segmentLen = Math.min(segmentSec, Math.max(durationSec - start, 0));
+    if (segmentLen <= 0) break;
+    windows.push({ start, segmentLen });
   }
 
+  const allChunks = [];
+  const MAX_CONCURRENT = 3;
+  const chunkLengthSec = 30;
+
+  for (let i = 0; i < windows.length; i += MAX_CONCURRENT) {
+    const batch = windows.slice(i, i + MAX_CONCURRENT);
+    const batchParts = await Promise.all(
+      batch.map(async ({ start, segmentLen }) => {
+        const tempRaw = path.join(os.tmpdir(), `audio-raw-${Date.now()}-${Math.floor(start)}.f32`);
+        console.log(`Extracting audio segment: ${start.toFixed(1)}s -> ${(start + segmentLen).toFixed(1)}s`);
+
+        await extractRawFloatAudio(videoPath, tempRaw, start, segmentLen);
+
+        console.log("Reading raw audio...");
+        const buffer = await fs.promises.readFile(tempRaw);
+        const sampleCount = Math.floor(buffer.length / 4);
+        const float32Data = new Float32Array(buffer.buffer, buffer.byteOffset, sampleCount);
+
+        console.log(`Transcribing segment ${Math.floor(start)}s with ${sampleCount} samples...`);
+        const output = await runTranscriptionInWorker(modelsPath, float32Data, chunkLengthSec);
+
+        const segmentChunks = (output?.chunks || []).map((chunk) => {
+          const s = Number(chunk?.timestamp?.[0] || 0) + start;
+          const e = Number(chunk?.timestamp?.[1] || s) + start;
+          return {
+            ...chunk,
+            timestamp: [s, e]
+          };
+        });
+
+        try {
+          fs.unlinkSync(tempRaw);
+        } catch (e) {}
+        
+        return segmentChunks;
+      })
+    );
+
+    for (const part of batchParts) {
+      allChunks.push(...part);
+    }
+  }
+
+  allChunks.sort((a, b) => Number(a.timestamp?.[0] || 0) - Number(b.timestamp?.[0] || 0));
   console.log("Transcription complete.");
+  return allChunks;
+});
+
+/**
+ * Online path: fast local audio extract (single ffmpeg encode per segment), then cloud STT.
+ * Requires OPENAI_API_KEY or apiKey from the renderer. Audio leaves the device.
+ */
+ipcMain.handle('transcription/getOpenAiKeyStatus', () => {
+  refreshEnvFromDotFiles();
+  const apiKey = resolveOpenAiKey('');
+  return {
+    fromEnv: !!(process.env.OPENAI_API_KEY || '').trim(),
+    fromSaved: hasAnyPersistedOpenAiKeyFile(),
+    canResolve: !!apiKey,
+    dotenvPath: lastDotEnvPathLoaded,
+  };
+});
+
+ipcMain.handle('transcription/saveOpenAiKeyToDotEnv', async (event, params) => {
+  const key = (params?.apiKey && String(params.apiKey).trim()) || '';
+  if (!key) throw new Error('Paste your sk-… key in the field first, then save.');
+  const root = findProjectRootForDotEnv();
+  if (!root) {
+    throw new Error(
+      'Could not locate this app project folder (package.json with name "empty_one"). Open the app from the cloned repo folder.'
+    );
+  }
+  const envPath = path.join(root, '.env');
+  mergeOpenAiKeyIntoDotEnvFile(envPath, key);
+  process.env.OPENAI_API_KEY = key;
+  lastDotEnvPathLoaded = envPath;
+  persistOpenAiKey(key);
+  console.log('[env] Saved OPENAI_API_KEY to', envPath);
+  return { ok: true, dotenvPath: envPath };
+});
+
+ipcMain.handle('transcription/testOpenAiKey', async (event, params) => {
+  refreshEnvFromDotFiles();
+  const keyFromUi = params?.apiKey;
+  const pasted = (keyFromUi && String(keyFromUi).trim()) || '';
+  if (pasted) persistOpenAiKey(pasted);
+  const apiKey = resolveOpenAiKey(pasted || undefined);
+  if (!apiKey) {
+    throw new Error(
+      'No API key found. Paste sk-… in the field, or put OPENAI_API_KEY=sk-… in a .env file next to package.json (no quotes), then click Check again.'
+    );
+  }
+  await verifyOpenAiKeyWithApi(apiKey);
+  return { ok: true };
+});
+
+ipcMain.handle('transcription/transcribeOnline', async (event, params) => {
+  const { videoPath, apiKey: keyFromUi } = params || {};
+  if (!videoPath) throw new Error('No video path provided');
+  if (!fs.existsSync(videoPath)) throw new Error('Video path does not exist');
+
+  refreshEnvFromDotFiles();
+
+  const pasted = (keyFromUi && String(keyFromUi).trim()) || '';
+  if (pasted) persistOpenAiKey(pasted);
+
+  const apiKey = resolveOpenAiKey(pasted || undefined);
+  if (!apiKey) {
+    const hint = lastDotEnvPathLoaded
+      ? ` .env was loaded from: ${lastDotEnvPathLoaded} — ensure it contains a non-empty OPENAI_API_KEY=gsk_… line.`
+      : ' No .env file was found next to package.json (or in parent folders). Paste your key or create .env there.';
+    throw new Error(
+      `Groq API key missing.${hint} It should start with gsk_.`
+    );
+  }
+
+  const durationSec = await probeDurationSeconds(videoPath);
+  console.log(`[online-transcribe] duration ${durationSec.toFixed(1)}s`);
+
+  const step = Math.max(20, ONLINE_TRANSCRIBE_CHUNK_SEC);
+  const windows = [];
+  for (let start = 0; start < Math.max(durationSec, 0.001); start += step) {
+    const segmentLen = Math.min(step, Math.max(durationSec - start, 0));
+    if (segmentLen <= 0) break;
+    windows.push({ start, segmentLen });
+  }
+
+  const allChunks = [];
+  for (let i = 0; i < windows.length; i += ONLINE_TRANSCRIBE_PARALLEL) {
+    const batch = windows.slice(i, i + ONLINE_TRANSCRIBE_PARALLEL);
+    const batchParts = await Promise.all(
+      batch.map(async ({ start, segmentLen }) => {
+        const tmpMp3 = path.join(os.tmpdir(), `stt-online-${Date.now()}-${start}-${Math.random().toString(16).slice(2)}.mp3`);
+        console.log(`[online-transcribe] ffmpeg segment ${start}s -> ${(start + segmentLen).toFixed(1)}s`);
+        await extractMp3AudioSegment(videoPath, tmpMp3, start, segmentLen);
+        try {
+          const partChunks = await transcribeMp3WithOpenAI(tmpMp3, apiKey);
+          return partChunks.map((c) => ({
+            ...c,
+            timestamp: [Number(c.timestamp?.[0] || 0) + start, Number(c.timestamp?.[1] || 0) + start],
+          }));
+        } finally {
+          try {
+            fs.unlinkSync(tmpMp3);
+          } catch {
+            // ignore
+          }
+        }
+      })
+    );
+    for (const part of batchParts) allChunks.push(...part);
+  }
+
+  allChunks.sort((a, b) => Number(a.timestamp?.[0] || 0) - Number(b.timestamp?.[0] || 0));
+
+  console.log('[online-transcribe] complete, segments:', allChunks.length);
   return allChunks;
 });
 
@@ -570,7 +984,6 @@ ipcMain.handle('offline-transcription/createJob', async (event, params) => {
     chunkSec = 30,
     modelPreset = 'balanced', // fast|balanced|high
     enableVad = true,
-    allowOver30Min = false,
   } = params || {};
 
   if (!videoPath) throw new Error('No video path provided');
@@ -581,14 +994,6 @@ ipcMain.handle('offline-transcription/createJob', async (event, params) => {
   if (durationSec <= OFFLINE_NORMAL_MAX_SEC) {
     return { mode: 'normal', durationSec };
   }
-  if (durationSec > OFFLINE_LONG_MAX_SEC && !allowOver30Min) {
-    return {
-      mode: 'over30',
-      durationSec,
-      warning: 'Video is longer than 30 minutes. Online mode is recommended. You can still force slow offline mode.',
-    };
-  }
-
   const safeChunk = Math.max(10, Math.min(60, Number(chunkSec) || 30));
   const jobId = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
   const { dir, jobJson, segmentsJson } = getJobPaths(jobId);
