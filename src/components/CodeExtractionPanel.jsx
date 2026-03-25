@@ -1,15 +1,16 @@
 import React, { useEffect, useRef, useState } from "react";
 import Tesseract from "tesseract.js";
+import { runGeminiExtraction } from "../services/geminiService";
 
-export default function CodeExtractionPanel({ videoPlayerRef, roi, isSelectingRoi, onRequestRoiSelect, onCancelRoiSelect }) {
+export default function CodeExtractionPanel({ videoPlayerRef, roi, isSelectingRoi, onRequestRoiSelect, onCancelRoiSelect, onScanStateChange, extractionMode }) {
   const [isScanning, setIsScanning] = useState(false);
   const [status, setStatus] = useState("Select ROI to begin");
   const [finalOutput, setFinalOutput] = useState("");
   const [copied, setCopied] = useState(false);
 
   // Internal scanning controls (minimum capture timings)
-  const minCheckMs = 250;     // how often we CHECK changes (cheap)
-  const minOcrCooldownMs = 1200; // minimum time between OCR runs (expensive)
+  const minOcrCooldownMs = extractionMode === "online" ? 1000 : 1200;
+  const minCheckMs = extractionMode === "online" ? 1000 : 250;     // how often we CHECK changes (cheap)
 
   // Refs for loop state
   const stopRef = useRef(true);
@@ -18,6 +19,9 @@ export default function CodeExtractionPanel({ videoPlayerRef, roi, isSelectingRo
   const lastSigRef = useRef(null);            // last frame signature
   const lastOcrAtRef = useRef(0);             // last OCR timestamp (real time ms)
   const lastAcceptedTextRef = useRef("");     // last accepted OCR snapshot text
+  
+  const geminiBlocksRef = useRef([]);
+  const lastBase64LengthRef = useRef(0);
   const lineMapRef = useRef(new Map());       // Map<lineNumber, { text, qualityScore, sourceFrame }>
   const frameCounterRef = useRef(0);
   const sessionModeRef = useRef(null);        // null | "numbered" | "unnumbered"
@@ -89,20 +93,58 @@ export default function CodeExtractionPanel({ videoPlayerRef, roi, isSelectingRo
     // ~0-2: almost same
     // ~3-8: small change
     // >8: significant change
-    return diff >= 6;
+    return diff >= (extractionMode === "online" ? 5 : 6);
   }
 
   // ---------- OCR step ----------
+  const runOnlineOnce = async (tNow) => {
+    if (!videoPlayerRef?.current || !roi) return;
+    setStatus(`Sending to Gemini @ ${formatTime(tNow)}...`);
+    try {
+      const codeOrSkip = await runGeminiExtraction(videoPlayerRef, roi, lastBase64LengthRef);
+      if (codeOrSkip?.skipped) {
+        setStatus(`Skipping identical frame @ ${formatTime(tNow)}`);
+        return;
+      }
+      const code = codeOrSkip;
+      if (!stopRef.current) {
+        geminiBlocksRef.current.push(code);
+        
+        const incomingLines = code.split("\n");
+        const merged = mergeUnnumberedLines(unnumberedLinesRef.current, incomingLines);
+        unnumberedLinesRef.current = merged;
+        const out = merged.join("\n");
+        setFinalOutput(out);
+        setStatus(`Code extracted @ ${formatTime(tNow)}`);
+      }
+    } catch (err) {
+      console.error(err);
+      if (!stopRef.current) {
+        let msg = err.message || "";
+        if (msg === "No code detected in selected ROI") {
+          setStatus(msg);
+        } else {
+          if (msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED")) {
+            msg = "Quota Exceeded (Daily limits hit - wait or check API Key restrictions)";
+          } else if (msg.length > 50) {
+            msg = msg.substring(0, 50) + "...";
+          }
+          setStatus(`API Error: ${msg}`);
+        }
+      }
+    }
+  };
+
   const runOcrOnce = async (videoTimeSec) => {
     if (!videoPlayerRef?.current || !roi) return;
 
     const canvas = videoPlayerRef.current.getVideoFrame(roi);
     if (!canvas) return;
 
-    // OCR
     setStatus(`OCR running @ ${formatTime(getVideoTime())}...`);
     const { data } = await Tesseract.recognize(canvas, "eng");
     const raw = data?.text || "";
+
     const normalizedFrameText = normalizeFrameText(raw);
     if (!normalizedFrameText) return;
 
@@ -181,7 +223,9 @@ export default function CodeExtractionPanel({ videoPlayerRef, roi, isSelectingRo
     unnumberedLinesRef.current = [];
     lastUnnumberedBlockSigRef.current = "";
     lastSigRef.current = null;
-    lastOcrAtRef.current = 0;
+    // DO NOT reset lastOcrAtRef.current = 0; to enforce global rate limits across session boundary clicks
+    geminiBlocksRef.current = [];
+    lastBase64LengthRef.current = 0;
   };
 
   const startExtraction = () => {
@@ -197,6 +241,7 @@ export default function CodeExtractionPanel({ videoPlayerRef, roi, isSelectingRo
 
     resetSession();
     setIsScanning(true);
+    onScanStateChange?.(true);
     setStatus(`Scanning... @ ${formatTime(getVideoTime())}`);
 
     const tick = async () => {
@@ -215,10 +260,14 @@ export default function CodeExtractionPanel({ videoPlayerRef, roi, isSelectingRo
         if (changed && cooldownOk) {
           lastOcrAtRef.current = nowMs;
           try {
-            await runOcrOnce(tNow);
+            if (extractionMode === "online") {
+              await runOnlineOnce(tNow);
+            } else {
+              await runOcrOnce(tNow);
+            }
           } catch (e) {
             console.error(e);
-            setStatus("OCR error (check console)");
+            setStatus(extractionMode === "online" ? "Gemini error (check console)" : "OCR error (check console)");
           }
         } else if (!changed) {
           setStatus(`No change @ ${formatTime(tNow)} (skipping)`);
@@ -233,13 +282,46 @@ export default function CodeExtractionPanel({ videoPlayerRef, roi, isSelectingRo
     tick();
   };
 
-  const stopExtraction = () => {
+  const stopExtraction = async () => {
     if (!isScanning) return;
     stopRef.current = true;
     setIsScanning(false);
+    onScanStateChange?.(false);
     setStatus("Scan stopped - finalizing");
     if (checkTimerRef.current) clearTimeout(checkTimerRef.current);
     checkTimerRef.current = null;
+    
+    // Stop the ROI selection immediately so the user can interact while merging completes
+    onCancelRoiSelect?.();
+
+    if (extractionMode === "online") {
+      const blocks = geminiBlocksRef.current;
+      if (blocks.length === 0) {
+        setFinalOutput("No code detected in selected ROI");
+        setStatus("No code detected in selected ROI");
+      } else if (blocks.length === 1) {
+        setFinalOutput(blocks[0]);
+        setStatus("Code extracted");
+      } else {
+        setStatus(`Merging ${blocks.length} frames with Gemini AI...`);
+        try {
+          const merged = await window.api.mergeCodeOnline(blocks);
+          setFinalOutput(merged || "No code detected");
+          setStatus("Frames successfully merged!");
+        } catch (err) {
+          console.error("Merge error:", err);
+          setFinalOutput(blocks.join("\n\n"));
+          let msg = err.message || "";
+          if (msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED")) {
+            msg = "Quota Exceeded (Daily limit hit - wait or check API Key restrictions)";
+          } else if (msg.length > 50) {
+            msg = msg.substring(0, 50) + "...";
+          }
+          setStatus(`Merge failed: ${msg}`);
+        }
+      }
+      return;
+    }
 
     const numberedOut = finalizeOrderedCode(lineMapRef.current);
     const unnumberedOut = unnumberedLinesRef.current.join("\n").trim();
@@ -251,7 +333,6 @@ export default function CodeExtractionPanel({ videoPlayerRef, roi, isSelectingRo
 
     setFinalOutput(out || "No code extracted");
     setStatus(out ? "Scan stopped" : "No code extracted");
-    onCancelRoiSelect?.();
   };
 
   const toggleScan = () => {
@@ -292,7 +373,7 @@ export default function CodeExtractionPanel({ videoPlayerRef, roi, isSelectingRo
   }, []);
 
   return (
-    <div className="code-card">
+    <div className="code-card" style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
       <div className="card-title">✨ OCR & Code Extraction</div>
 
       <div className="card-desc">
@@ -341,7 +422,17 @@ export default function CodeExtractionPanel({ videoPlayerRef, roi, isSelectingRo
         Status: {status}
       </div>
 
-      <div className="output-area" style={{ whiteSpace: "pre-wrap" }}>
+      <div className="output-area" style={{ 
+        whiteSpace: "pre-wrap", 
+        fontSize: "15px", 
+        flex: "1 1 0px", 
+        minHeight: 0,
+        fontFamily: "'Fira Code', 'Courier New', monospace",
+        border: "1px solid #4ade80",
+        padding: "10px",
+        borderRadius: "6px",
+        overflowY: "auto"
+      }}>
         {finalOutput || "Final code will appear here after the scan ends..."}
       </div>
     </div>

@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle } f
 import CodeExtractionPanel from "./CodeExtractionPanel";
 import "./Sidebar.css";
 
-const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRoi, onRequestRoiSelect, onCancelRoiSelect }, ref) {
+const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRoi, onRequestRoiSelect, onCancelRoiSelect, onScanStateChange, extractionMode }, ref) {
   const [activeTab, setActiveTab] = useState("Code");
 
   // --- Speech / Audio Extraction ---
@@ -275,6 +275,8 @@ const Sidebar = forwardRef(function Sidebar({ videoPlayerRef, roi, isSelectingRo
             isSelectingRoi={isSelectingRoi} 
             onRequestRoiSelect={onRequestRoiSelect} 
             onCancelRoiSelect={onCancelRoiSelect}
+            onScanStateChange={onScanStateChange}
+            extractionMode={extractionMode}
           />
         )}
 

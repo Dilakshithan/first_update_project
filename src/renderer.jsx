@@ -11,6 +11,8 @@ const APP = () => {
   const sidebarRef = useRef(null);
   const [roi, setRoi] = useState(null);
   const [isSelectingRoi, setIsSelectingRoi] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [extractionMode, setExtractionMode] = useState("offline");
 
   const openFile = () => {
     videoPlayerRef.current?.openFileDialog?.();
@@ -22,7 +24,7 @@ const APP = () => {
 
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
-      <Header openFile={openFile} />
+      <Header openFile={openFile} extractionMode={extractionMode} setExtractionMode={setExtractionMode} />
 
       <div style={{ flex: 1, display: "flex", gap: "24px", padding: "24px" }}>
         <VideoPlayer 
@@ -31,6 +33,7 @@ const APP = () => {
           onRoiChange={(newRoi) => { setRoi(newRoi); setIsSelectingRoi(false); }} 
           onPlay={onVideoPlay} 
           isSelectingRoi={isSelectingRoi} 
+          isScanning={isScanning}
         />
         <Sidebar 
           ref={sidebarRef} 
@@ -39,6 +42,8 @@ const APP = () => {
           isSelectingRoi={isSelectingRoi}
           onRequestRoiSelect={() => setIsSelectingRoi(true)}
           onCancelRoiSelect={() => { setIsSelectingRoi(false); setRoi(null); }}
+          onScanStateChange={(scanning) => setIsScanning(scanning)}
+          extractionMode={extractionMode}
         />
       </div>
     </div>

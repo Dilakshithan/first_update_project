@@ -3,6 +3,8 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 contextBridge.exposeInMainWorld('api', {
   extractAudio: (path) => ipcRenderer.invoke('extract-audio', path),
   chatCopilot: (messages) => ipcRenderer.invoke('chat-copilot', messages),
+  extractCodeOnline: (base64Image) => ipcRenderer.invoke('extract-code-online', base64Image),
+  mergeCodeOnline: (framesList) => ipcRenderer.invoke('merge-code-online', framesList),
   // Long-video offline transcription (job-based)
   createOfflineTranscriptionJob: (params) => ipcRenderer.invoke('offline-transcription/createJob', params),
   startOfflineTranscription: (jobId) => ipcRenderer.invoke('offline-transcription/start', jobId),

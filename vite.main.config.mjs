@@ -9,7 +9,10 @@ export default defineConfig({
         'onnxruntime-node',
         'fluent-ffmpeg',
         'ffmpeg-static',
-        'wavefile'
+        'wavefile',
+        'bufferutil',
+        'utf-8-validate',
+        '@google/genai'
       ]
     }
   }

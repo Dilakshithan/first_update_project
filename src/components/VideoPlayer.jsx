@@ -8,7 +8,7 @@ import React, {
 import "./VideoPlayer.css";
 import RoiSelector from "./RoiSelector";
 
-const VideoPlayer = forwardRef(function VideoPlayer({ roi, onRoiChange, onPlay, isSelectingRoi }, ref) {
+const VideoPlayer = forwardRef(function VideoPlayer({ roi, onRoiChange, onPlay, isSelectingRoi, isScanning }, ref) {
   const videoRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -225,10 +225,11 @@ const VideoPlayer = forwardRef(function VideoPlayer({ roi, onRoiChange, onPlay, 
           src={videoSrc || undefined}
         />
 
-        {/* ROI overlay only when a video is loaded */}
+        {/* ROI overlay properly mounts permanently but uses internal logic to hide via CSS during scans */}
         {videoSrc && (
           <RoiSelector
             enabled={Boolean(isSelectingRoi)}
+            isScanning={isScanning}
             currentRoi={roi}
             onChange={(overlayRoi) => {
               const mapped = toVideoNormalizedRoi(overlayRoi);

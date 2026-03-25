@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
+import { GoogleGenAI } from "@google/genai";
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import ffmpeg from 'fluent-ffmpeg';
@@ -377,6 +378,128 @@ ipcMain.handle('chat-copilot', async (event, messages) => {
   return response.replace(/<\|im_end\|>/g, '').trim();
 });
 
+ipcMain.handle('extract-code-online', async (event, base64Data) => {
+  let apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || process.env.VITE_GOOGLE_API_KEY || "";
+  
+  try {
+    const envPath = path.join(app.getAppPath(), '.env');
+    if (fs.existsSync(envPath)) {
+      const text = fs.readFileSync(envPath, 'utf8');
+      const match = text.match(/^(?:VITE_)?(?:GOOGLE|GEMINI)_API_KEY\s*=\s*(.*)$/m);
+      if (match && match[1]) {
+         apiKey = match[1].trim().replace(/^['"]|['"]$/g, '');
+      }
+    }
+  } catch (e) {}
+
+  if (!apiKey) {
+    throw new Error("Missing Google API Key.\\nPlease create a .env file in the project folder containing:\\nVITE_GOOGLE_API_KEY=your_key_here");
+  }
+
+  try {
+    console.log(`[Gemini Main] Sending request to Gemini API via SDK (Base64 payload length: ${base64Data.length})`);
+    const ai = new GoogleGenAI({ apiKey: apiKey });
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              mimeType: "image/jpeg",
+              data: base64Data
+            }
+          },
+          {
+            text: `You are an expert software engineer and OCR correction system.\n\nYour task is to extract ONLY the programming code visible in this image.\n\nSTRICT INSTRUCTIONS:\n1. Extract ONLY code. Do NOT include explanations, comments, or descriptions.\n2. Ignore all non-code UI elements such as file explorer, line numbers, icons, menus, terminal panels, and background text.\n3. Fix OCR errors intelligently:\n   - correct obvious variable names\n   - fix broken symbols such as { } ( ) ; : , .\n   - restore likely syntax\n4. Maintain correct formatting:\n   - proper indentation\n   - correct line breaks\n   - preserve logical structure\n5. If part of the code is unclear, infer only the most likely visible code.\n6. DO NOT add new logic that is not visible.\n7. DO NOT include markdown formatting.\n8. Return ONLY the cleaned code.`
+          }
+        ]
+      },
+      config: { temperature: 0.1 }
+    });
+    
+    const extractedText = response.text || "";
+    console.log("[online] SDK extracted text:", extractedText);
+    return extractedText;
+  } catch (err) {
+    console.error("[Gemini Main] Extraction request failed:", err.message);
+    throw err;
+  }
+});
+
+ipcMain.handle('merge-code-online', async (event, framesList) => {
+  if (!framesList || framesList.length === 0) return "";
+  
+  let apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || process.env.VITE_GOOGLE_API_KEY || "";
+  try {
+    const envPath = path.join(app.getAppPath(), '.env');
+    if (fs.existsSync(envPath)) {
+      const text = fs.readFileSync(envPath, 'utf8');
+      const match = text.match(/^(?:VITE_)?(?:GOOGLE|GEMINI)_API_KEY\s*=\s*(.*)$/m);
+      if (match && match[1]) {
+         apiKey = match[1].trim().replace(/^['"]|['"]$/g, '');
+      }
+    }
+  } catch (e) {}
+
+  if (!apiKey) throw new Error("Missing Google API Key.");
+
+  let prompt = `You are a senior software engineer resolving a code merge.
+
+I extracted code from a scrolling video frame-by-frame.
+Because the video scrolls, there is heavy duplication and overlap between frames.
+
+Your task is to MERGE all frames into ONE clean, correct, complete code file.
+
+CRITICAL RULES:
+1. DO NOT concatenate blocks.
+2. Detect overlapping lines between consecutive frames.
+3. Merge overlapping sections seamlessly.
+4. REMOVE all duplication completely.
+5. If the same function, class, block, or logic appears multiple times, KEEP ONLY ONE.
+6. Maintain the original top-to-bottom order of the code.
+7. Fix small inconsistencies between frames, such as broken indentation or split lines.
+8. Do NOT remove unique code.
+9. Do NOT introduce new logic.
+10. Return ONLY the final deduplicated code.
+11. Do NOT include markdown.
+12. Do NOT include explanations.
+
+Here are the extracted frames in chronological order:\\n`;
+  
+  framesList.forEach((frameCode, i) => {
+    prompt += `--- FRAME \${i+1} ---\\n\${frameCode}\\n\\n`;
+  });
+  
+  try {
+    console.log(`[Gemini Main] Sending multi-frame merge request via SDK (\${framesList.length} frames)`);
+    const ai = new GoogleGenAI({ apiKey: apiKey });
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: { temperature: 0.1 }
+    });
+    
+    let mergedText = response.text || "";
+    
+    // Strip markdown fences just in case API disobeys rule 11
+    if (mergedText.trim().startsWith("\`\`\`")) {
+      const lines = mergedText.trim().split("\\n");
+      if (lines.length > 1) {
+        lines.shift();
+        if (lines[lines.length - 1].trim().startsWith("\`\`\`")) {
+          lines.pop();
+        }
+        mergedText = lines.join("\\n");
+      }
+    }
+    
+    console.log(`[Gemini Main] Multi-frame merge successful. Extracted text length: \${mergedText.length}`);
+    return mergedText;
+  } catch (err) {
+    console.error("[Gemini Main] Merge request failed:", err.message);
+    throw err;
+  }
+});
 
 ipcMain.handle('extract-audio', async (event, videoPath) => {
   if (!videoPath) throw new Error("No video path provided");

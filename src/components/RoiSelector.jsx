@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect } from "react";
 import "./RoiSelector.css";
 
-export default function RoiSelector({ enabled = true, currentRoi, onChange }) {
+export default function RoiSelector({ enabled = true, isScanning = false, currentRoi, onChange }) {
   const overlayRef = useRef(null);
   const [dragging, setDragging] = useState(false);
   const [start, setStart] = useState(null);
@@ -70,7 +70,7 @@ export default function RoiSelector({ enabled = true, currentRoi, onChange }) {
           }}
         />
       )}
-      <div className="roi-hint">Drag to select ROI (code area)</div>
+      <div className="roi-hint" style={{ display: isScanning ? "none" : undefined }}>Drag to select ROI (code area)</div>
     </div>
   );
 }
